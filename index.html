@@ -331,7 +331,8 @@
         <div id="battle-section">
             <div class="bg-gray-900 text-white p-2 text-center shadow-md z-10 flex justify-between items-center px-4 text-sm md:text-base shrink-0">
                 <span id="top-name-display" class="font-bold text-red-400">레드 진영 (상대)</span>
-                <span id="timer" class="text-yellow-400 font-jua text-xl md:text-2xl tracking-wider">02:00</span>
+                <!-- 변경됨: 시작 시간이 03:00으로 표시됩니다 -->
+                <span id="timer" class="text-yellow-400 font-jua text-xl md:text-2xl tracking-wider">03:00</span>
                 <span id="bottom-name-display" class="font-bold text-blue-400">블루 진영 (나)</span>
             </div>
             <div id="battlefield">
@@ -718,8 +719,8 @@ window.startBossIntro = function() {
     if (myDeck.length !== maxDeckSize) { window.showToast("덱을 꽉 채워주세요!"); return; }
     window.isMultiplayer = false;
     window.isVsAI = false;
-    document.getElementById('player-name-display').innerText = "아군 진영";
-    document.getElementById('enemy-name-display').innerText = "적 보스";
+    document.getElementById('bottom-name-display').innerText = "아군 진영";
+    document.getElementById('top-name-display').innerText = "적 보스";
     
     window.showScreen('boss-intro-screen');
     const stageInfo = stageData[currentStage-1];
@@ -976,13 +977,12 @@ function startGameMultiplayer(hostName, guestName) {
             snapshot.docChanges().forEach((change) => {
                 if (change.type === 'added') {
                     const data = change.doc.data();
-                    // 현재 매치의 고유 세션 ID가 일치하는 스폰만 처리 (기기 간 시간차 문제 완벽 해결)
+                    // 현재 매치의 고유 세션 ID가 일치하는 스폰만 처리
                     if (data.roomId === currentRoomCode && data.sessionId === window.currentSessionId) {
                         // 상대방(다른 진영)이 보낸 스폰만 렌더링
                         if (data.team !== window.myTeam) {
                             let spawnX = data.xRatio * CANVAS_WIDTH;
                             let spawnY = data.yRatio * CANVAS_HEIGHT;
-                            // 좌표 반전 삭제: 이제 모두 동일한 절대 화면을 공유합니다.
                             entities.push(new Unit(spawnX, spawnY, data.team, data.cardId));
                         }
                     }
@@ -1004,10 +1004,11 @@ const MAX_ELIXIR = 10;
 const ELIXIR_GEN_RATE = 0.5;
 
 let entities = []; let towers = []; let particles = []; 
-let timeRemaining = 120;
+let timeRemaining = 180;
 
 let selectedCardIndex = -1; let selectedCardCost = 0; let windowCurrentSelectedCardId = null;
 let currentEnemyDeck = [];
+window.lastSummonTime = 0; // 연타 방지 쿨타임용 변수
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -1052,6 +1053,13 @@ window.clearSelection = function() {
 
 battlefield.addEventListener('click', async (e) => {
     if (selectedCardIndex === -1 || isGameOver) return;
+    
+    // ★ 연타 방지 쿨타임 (250ms) - 네트워크 유실 및 중복 생성 방지
+    const now = Date.now();
+    if (window.lastSummonTime && now - window.lastSummonTime < 250) {
+        return; 
+    }
+    
     const rect = canvas.getBoundingClientRect(); 
     // 터치 및 클릭 정확도 보정
     const x = e.clientX - rect.left; 
@@ -1065,6 +1073,7 @@ battlefield.addEventListener('click', async (e) => {
     if (!validTower) { window.showToast("아군 타워 근처에 소환하세요!"); return; }
 
     if (elixir >= selectedCardCost) {
+        window.lastSummonTime = now; // 쿨타임 기록
         elixir -= selectedCardCost; updateElixirUI();
         
         // 로컬에 즉시 스폰
@@ -1420,7 +1429,8 @@ function initGame(enemyDeckConfig) {
     document.getElementById('battle-screen').style.display = 'flex';
     resizeCanvas();
     entities = []; towers = []; particles = []; 
-    elixir = 5.0; timeRemaining = 120; isGameOver = false;
+    // ★ 타이머를 180초(3분)로 연장
+    elixir = 5.0; timeRemaining = 180; isGameOver = false;
     document.getElementById('game-over').style.display = 'none';
 
     const enemyHpMult = (gameMode === 'stage' && currentStage > 0) ? 1 + (currentStage - 1) * 0.5 : 1;
