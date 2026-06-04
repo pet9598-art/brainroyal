@@ -376,7 +376,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- 커스텀 Toast 알림 기능 (alert() 대체) ---
@@ -396,26 +396,26 @@ window.showToast = function(msg, isSuccess = false) {
     }, 2500);
 };
 
-
 // --- Firebase Initialization (Firestore, Rule 1, 2, 3 호환) ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-    // Fallback dummy for structure. Real env will use __firebase_config.
-    projectId: "demo-project"
+const firebaseConfig = {
+    apiKey: "AIzaSyBcHb9vGidW7BfR63HzX0jZZumt4A_kOg4",
+    authDomain: "brainroyal-22d66.firebaseapp.com",
+    projectId: "brainroyal-22d66",
+    storageBucket: "brainroyal-22d66.firebasestorage.app",
+    messagingSenderId: "525375050441",
+    appId: "1:525375050441:web:8864fa7b89f808c60b7318"
 };
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const appId = "brain-royale-pvp";
 
 let currentUser = null;
 
 const initAuth = async () => {
     try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-            await signInAnonymously(auth);
-        }
+        await signInAnonymously(auth);
     } catch (e) {
         console.error("Auth Error:", e);
         document.getElementById('auth-status').innerText = "인증 실패 (로컬 모드)";
