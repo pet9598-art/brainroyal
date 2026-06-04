@@ -5,35 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Brain Royale: 5th Grade Math</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- ★ 파이어베이스 SDK 로드 (PVP 멀티플레이용) ★ -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue, push, update, onDisconnect, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-        
-        const firebaseConfig = {
-            apiKey: "AIzaSyBcHb9vGidW7BfR63HzX0jZZumt4A_kOg4",
-            authDomain: "brainroyal-22d66.firebaseapp.com",
-            databaseURL: "https://brainroyal-22d66-default-rtdb.firebaseio.com",
-            projectId: "brainroyal-22d66",
-            storageBucket: "brainroyal-22d66.firebasestorage.app",
-            messagingSenderId: "525375050441",
-            appId: "1:525375050441:web:8864fa7b89f808c60b7318"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
-
-        window.firebaseDB = database;
-        window.firebaseRef = ref;
-        window.firebaseSet = set;
-        window.firebaseOnValue = onValue;
-        window.firebasePush = push;
-        window.firebaseUpdate = update;
-        window.firebaseOnDisconnect = onDisconnect;
-        window.firebaseOnChildAdded = onChildAdded;
-    </script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap');
         
@@ -73,14 +44,15 @@
             height: 100vh;
             background-color: #0f172a;
             color: white;
-            padding: 40px;
+            padding: 20px md:padding-40px;
             align-items: center;
             z-index: 40;
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
+            overflow-y: auto;
         }
 
-        #deck-screen { background-color: #1e293b; overflow-y: auto; }
+        #deck-screen { background-color: #1e293b; }
 
         #boss-intro-screen {
             background: linear-gradient(135deg, #0f172a, #1e1b4b);
@@ -88,7 +60,6 @@
             z-index: 45;
         }
 
-        /* 신규: PVP 대기방 스타일 */
         #pvp-lobby-screen {
             background: linear-gradient(135deg, #1e1b4b, #312e81);
             justify-content: center;
@@ -107,7 +78,10 @@
         }
         .boss-image-container { animation: float-boss 3s ease-in-out infinite; }
 
-        #battle-screen { display: none; width: 100%; height: 100%; }
+        #battle-screen { display: none; width: 100%; height: 100%; flex-direction: column; }
+        @media (min-width: 768px) {
+            #battle-screen { flex-direction: row; }
+        }
 
         #battle-section {
             flex-grow: 1;
@@ -121,27 +95,37 @@
             flex-direction: column;
             overflow: hidden;
             box-shadow: inset 0 0 30px rgba(0,0,0,0.2);
+            height: 60vh;
+        }
+        @media (min-width: 768px) {
+            #battle-section { height: 100%; }
         }
 
         #battlefield { flex-grow: 1; position: relative; width: 100%; height: 100%; }
         canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
 
         #ui-section {
-            width: 400px; min-width: 350px;
+            width: 100%; height: 40vh;
             background-color: #1f2937;
             display: flex; flex-direction: column;
-            border-left: 4px solid #111827;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            border-top: 4px solid #111827;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
             z-index: 20;
         }
+        @media (min-width: 768px) {
+            #ui-section { width: 400px; min-width: 350px; height: 100%; border-left: 4px solid #111827; border-top: none; box-shadow: -5px 0 15px rgba(0,0,0,0.5); }
+        }
 
-        #quiz-panel { flex-grow: 1; background: #ffffff; display: flex; flex-direction: column; padding: 1rem; }
+        #quiz-panel { flex-grow: 1; background: #ffffff; display: flex; flex-direction: column; padding: 0.5rem; overflow-y: auto;}
+        @media (min-width: 768px) { #quiz-panel { padding: 1rem; } }
 
         .elixir-bar-container {
-            background: #374151; height: 24px; border-radius: 12px;
+            background: #374151; height: 20px; border-radius: 10px;
             overflow: hidden; position: relative; border: 2px solid #111827;
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
         }
+        @media (min-width: 768px) { .elixir-bar-container { height: 24px; border-radius: 12px; } }
+        
         .elixir-bar { height: 100%; background: linear-gradient(90deg, #ec4899, #fbcfe8); transition: width 0.2s ease-out; }
 
         .card { transition: transform 0.1s, border-color 0.1s; cursor: pointer; }
@@ -156,8 +140,8 @@
         }
 
         @keyframes floatUp {
-            0% { opacity: 1; transform: translateY(0) scale(1); }
-            100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
+            0% { opacity: 1; transform: translateY(0) scale(1) translateX(-50%); }
+            100% { opacity: 0; transform: translateY(-40px) scale(1.2) translateX(-50%); }
         }
         .floating-text {
             position: absolute; font-weight: bold; color: white;
@@ -165,14 +149,18 @@
             animation: floatUp 1s ease-out forwards; z-index: 100;
         }
 
-        .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; margin-bottom: 20px; }
+        @media (min-width: 768px) { .deck-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; } }
+        
         .deck-card {
             aspect-ratio: 3/4; border-radius: 10px; display: flex; flex-direction: column;
             align-items: center; justify-content: center; position: relative;
             cursor: pointer; border: 3px solid transparent; transition: transform 0.1s, filter 0.1s;
             box-shadow: 0 4px 10px rgba(0,0,0,0.4); color: white; 
         }
-        .deck-card svg { width: 35px; height: 35px; margin-bottom: 4px; margin-top: 8px; }
+        .deck-card svg { width: 30px; height: 30px; margin-bottom: 2px; margin-top: 6px; }
+        @media (min-width: 768px) { .deck-card svg { width: 35px; height: 35px; margin-bottom: 4px; margin-top: 8px; } }
+        
         .deck-card:active { transform: scale(0.95); }
         .deck-card.in-deck { border-color: #fbbf24; }
         .deck-card.disabled { filter: grayscale(100%); opacity: 0.3; }
@@ -182,85 +170,102 @@
             background: rgba(0,0,0,0.85); z-index: 1000; flex-direction: column;
             justify-content: center; align-items: center; color: white;
         }
+        
+        /* 스크롤바 숨기기 (모바일 쾌적화) */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
 <body>
 
+<!-- 커스텀 알림창 (Toast) -->
+<div id="toast-container" class="fixed top-0 left-1/2 transform -translate-x-1/2 z-[9999] transition-all duration-300 opacity-0 pointer-events-none mt-4">
+    <div id="toast-message" class="bg-red-600 text-white px-6 py-3 rounded-full shadow-2xl font-jua text-xl md:text-2xl border-2 border-white text-center min-w-[300px]">
+        메시지
+    </div>
+</div>
+
 <div id="game-container">
+    <!-- 메인 타이틀 화면 -->
     <div id="title-screen">
-        <div class="absolute w-full px-4 sm:px-10 md:px-16 lg:px-24 xl:px-32 top-[65%] flex justify-between items-center transform -translate-y-1/2">
-            <button onclick="showScreen('unlock-screen'); generateUnlockProblem();" class="w-40 sm:w-56 md:w-72 lg:w-80 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-jua text-lg sm:text-2xl md:text-3xl py-3 md:py-5 rounded-2xl shadow-2xl transition-all transform hover:scale-105 border-4 border-emerald-400 flex items-center justify-center gap-2 md:gap-3">
+        <div class="absolute w-full px-4 sm:px-10 top-[60%] flex flex-col items-center justify-center gap-4 transform -translate-y-1/2">
+            <button onclick="window.showScreen('unlock-screen'); window.generateUnlockProblem();" class="w-64 sm:w-80 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-jua text-xl md:text-3xl py-3 md:py-4 rounded-2xl shadow-2xl transition-all transform hover:scale-105 border-4 border-emerald-400 flex items-center justify-center gap-2 md:gap-3">
                 <span>🔓</span> 덱 해금하기
             </button>
-            <button onclick="showScreen('deck-screen'); renderDeckScreen();" class="w-40 sm:w-56 md:w-72 lg:w-80 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-jua text-lg sm:text-2xl md:text-3xl py-3 md:py-5 rounded-2xl shadow-2xl transition-all transform hover:scale-105 border-4 border-blue-400 flex items-center justify-center gap-2 md:gap-3">
-                <span>⚔️</span> 전투 준비
+            <button onclick="window.openDeckForStage();" class="w-64 sm:w-80 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-jua text-xl md:text-3xl py-3 md:py-4 rounded-2xl shadow-2xl transition-all transform hover:scale-105 border-4 border-blue-400 flex items-center justify-center gap-2 md:gap-3">
+                <span>⚔️</span> 스테이지 전투
             </button>
+            <button onclick="window.openDeckForPvP();" class="w-64 sm:w-80 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-jua text-xl md:text-3xl py-3 md:py-4 rounded-2xl shadow-2xl transition-all transform hover:scale-105 border-4 border-red-400 flex items-center justify-center gap-2 md:gap-3 mt-4">
+                <span>🌐</span> PvP 멀티플레이
+            </button>
+            <div id="auth-status" class="text-yellow-300 font-bold mt-2 text-sm drop-shadow-md animate-pulse">서버 접속 중...</div>
         </div>
     </div>
 
+    <!-- 덱 해금 화면 -->
     <div id="unlock-screen">
-        <div class="w-full max-w-3xl flex justify-between items-center mb-8">
-            <button onclick="showScreen('title-screen')" class="text-white font-jua text-xl bg-gray-700 px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors shadow-md">◀ 메인 화면으로</button>
-            <h2 class="font-jua text-4xl text-emerald-400 drop-shadow-md">새로운 몬스터를 해금하세요!</h2>
-            <div class="w-32"></div>
+        <div class="w-full max-w-3xl flex justify-between items-center mb-8 px-4 pt-4">
+            <button onclick="window.showScreen('title-screen')" class="text-white font-jua text-sm md:text-xl bg-gray-700 px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors shadow-md">◀ 메인 화면</button>
+            <h2 class="font-jua text-2xl md:text-4xl text-emerald-400 drop-shadow-md">새 몬스터 해금!</h2>
+            <div class="w-20 md:w-32"></div>
         </div>
-        <div class="bg-slate-800 p-10 rounded-3xl border-4 border-slate-600 shadow-2xl w-full max-w-3xl flex flex-col items-center">
-            <h3 class="font-bold text-xl text-emerald-200 mb-8 text-center bg-slate-900 px-6 py-2 rounded-full">쉬운 수학 문제를 풀고 새로운 카드를 얻어보세요.</h3>
-            <div id="unlock-question" class="text-center font-bold text-4xl text-white bg-slate-900 py-16 px-8 rounded-2xl border-2 border-emerald-500 w-full mb-10 shadow-inner">문제 로딩중...</div>
-            <div id="unlock-answers" class="grid grid-cols-2 gap-6 w-full"></div>
+        <div class="bg-slate-800 p-6 md:p-10 rounded-3xl border-4 border-slate-600 shadow-2xl w-full max-w-3xl flex flex-col items-center">
+            <h3 class="font-bold text-sm md:text-xl text-emerald-200 mb-6 text-center bg-slate-900 px-6 py-2 rounded-full">수학 문제를 풀고 새로운 카드를 얻으세요.</h3>
+            <div id="unlock-question" class="text-center font-bold text-2xl md:text-4xl text-white bg-slate-900 py-10 md:py-16 px-4 md:px-8 rounded-2xl border-2 border-emerald-500 w-full mb-8 shadow-inner">문제 로딩중...</div>
+            <div id="unlock-answers" class="grid grid-cols-2 gap-4 w-full"></div>
         </div>
         <div id="unlock-modal" class="hidden absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center">
-            <h2 class="font-jua text-6xl text-yellow-400 mb-12 animate-bounce">새로운 카드 획득!</h2>
-            <div id="unlocked-card-display" class="mb-20"></div>
-            <button onclick="closeUnlockModal()" class="bg-blue-500 hover:bg-blue-600 text-white font-jua text-3xl py-4 px-12 rounded-full shadow-lg border-2 border-blue-300 transition-transform hover:scale-105">계속하기</button>
+            <h2 class="font-jua text-5xl md:text-6xl text-yellow-400 mb-12 animate-bounce">새로운 카드 획득!</h2>
+            <div id="unlocked-card-display" class="mb-20 transform scale-150"></div>
+            <button onclick="window.closeUnlockModal()" class="bg-blue-500 hover:bg-blue-600 text-white font-jua text-2xl md:text-3xl py-3 px-10 rounded-full shadow-lg border-2 border-blue-300 transition-transform hover:scale-105">계속하기</button>
         </div>
     </div>
 
-    <!-- 로비 및 PVP 덱 구성 화면 -->
-    <div id="deck-screen">
-        <div class="flex justify-between items-center w-full mb-4">
-            <button onclick="showScreen('title-screen')" class="text-white font-jua text-xl bg-gray-700 px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors shadow-md">◀ 메인 화면으로</button>
+    <!-- 전투 덱 및 로비 화면 -->
+    <div id="deck-screen" class="p-4 md:p-10 w-full h-full flex flex-col">
+        <div class="flex justify-between items-center w-full mb-4 shrink-0">
+            <button onclick="window.showScreen('title-screen')" class="text-white font-jua text-sm md:text-xl bg-gray-700 px-3 py-2 md:px-6 md:py-3 rounded-lg hover:bg-gray-600 transition-colors shadow-md">◀ 메인</button>
             
-            <div class="flex items-center gap-4 bg-slate-800 px-6 py-2 rounded-full border-2 border-slate-600 shadow-lg">
-                <button onclick="changeMode(-1)" class="text-yellow-400 hover:text-yellow-300 text-3xl font-bold">◀</button>
-                <h2 id="mode-display" class="font-jua text-4xl text-center text-yellow-400 w-48">스테이지 1</h2>
-                <button onclick="changeMode(1)" class="text-yellow-400 hover:text-yellow-300 text-3xl font-bold">▶</button>
+            <div id="stage-selector" class="flex items-center gap-2 md:gap-4 bg-slate-800 px-4 py-2 rounded-full border-2 border-slate-600 shadow-lg">
+                <button onclick="window.changeStage(-1)" class="text-yellow-400 hover:text-yellow-300 text-2xl md:text-3xl font-bold">◀</button>
+                <h2 id="mode-display" class="font-jua text-2xl md:text-4xl text-center text-yellow-400 w-32 md:w-48">스테이지 1</h2>
+                <button onclick="window.changeStage(1)" class="text-yellow-400 hover:text-yellow-300 text-2xl md:text-3xl font-bold">▶</button>
             </div>
             
-            <div class="w-32"></div>
+            <div class="w-16 md:w-32 shrink-0 text-right">
+                <span id="deck-count-indicator" class="text-yellow-400 font-jua text-lg md:text-xl bg-slate-800 px-3 py-1 rounded-lg">0/0</span>
+            </div>
         </div>
         
-        <div class="mb-4 bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
-            <h3 class="font-bold text-lg mb-2 flex justify-between">
-                <span class="text-white">선택된 전투 덱</span>
-                <span id="deck-count" class="text-yellow-400 font-jua text-xl">4/4</span>
-            </h3>
-            <div id="my-deck-grid" class="deck-grid min-h-[100px] !grid-cols-6"></div>
+        <div class="mb-4 bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg shrink-0">
+            <h3 class="font-bold text-sm md:text-lg mb-2 text-white">선택된 전투 덱</h3>
+            <div id="my-deck-grid" class="deck-grid min-h-[90px] !grid-cols-4 md:!grid-cols-6"></div>
         </div>
-        <div class="flex-grow bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-inner">
-            <h3 class="font-bold text-lg mb-2 text-gray-300">보유 몬스터 (1~6 코스트)</h3>
-            <div id="inventory-grid" class="deck-grid !grid-cols-8"></div>
+        <div class="flex-grow bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-inner overflow-y-auto mb-4">
+            <h3 class="font-bold text-sm md:text-lg mb-2 text-gray-300">보유 몬스터 (터치하여 덱에 추가)</h3>
+            <div id="inventory-grid" class="deck-grid !grid-cols-4 sm:!grid-cols-6 md:!grid-cols-8"></div>
         </div>
         
-        <div id="stage-controls" class="flex justify-center mt-4 mb-4">
-            <button onclick="startBossIntro()" class="w-full max-w-md bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-jua text-3xl py-4 rounded-2xl shadow-xl transition-all transform hover:scale-105 disabled:hover:scale-100">
+        <!-- 스테이지용 하단 패널 -->
+        <div id="stage-controls" class="flex justify-center shrink-0">
+            <button onclick="window.startBossIntro()" class="w-full max-w-md bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-jua text-2xl md:text-3xl py-3 md:py-4 rounded-2xl shadow-xl transition-all transform hover:scale-105 disabled:hover:scale-100">
                 보스전 진입!
             </button>
         </div>
 
-        <div id="pvp-controls" class="hidden flex-col items-center mt-4 mb-4 w-full max-w-lg mx-auto gap-4 bg-slate-800 p-6 rounded-2xl border-4 border-red-500 shadow-xl">
-            <h3 class="text-3xl font-jua text-red-400">🔥 대결하기 (PVP)</h3>
-            <input type="text" id="nickname-input" placeholder="나의 닉네임을 입력하세요" class="w-full px-4 py-3 rounded-xl text-black font-bold text-xl text-center outline-none focus:ring-4 ring-red-400">
+        <!-- PVP 매치메이킹용 하단 패널 -->
+        <div id="pvp-controls" class="hidden flex-col items-center w-full max-w-lg mx-auto gap-4 bg-slate-800 p-4 md:p-6 rounded-2xl border-4 border-red-500 shadow-xl shrink-0">
+            <h3 class="text-2xl md:text-3xl font-jua text-red-400">🔥 대결하기 (PVP)</h3>
+            <input type="text" id="nickname-input" placeholder="나의 닉네임을 입력하세요" class="w-full px-4 py-2 md:py-3 rounded-xl text-black font-bold text-lg md:text-xl text-center outline-none focus:ring-4 ring-red-400">
             
-            <button onclick="createPvPRoom()" class="w-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-jua text-2xl py-3 rounded-xl shadow-lg transition-all transform hover:scale-105">
+            <button onclick="window.createPvPRoom()" class="w-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-jua text-xl md:text-2xl py-3 rounded-xl shadow-lg transition-all transform hover:scale-105">
                 새로운 방 개설하기
             </button>
             
             <div class="w-full h-px bg-slate-600 my-1"></div>
             
             <div class="flex w-full gap-2">
-                <input type="text" id="room-id-input" placeholder="방 코드 (4자리)" class="w-1/2 px-4 py-3 rounded-xl text-black font-bold text-lg text-center outline-none focus:ring-4 ring-purple-400">
-                <button onclick="joinPvPRoom()" class="w-1/2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-jua text-2xl py-3 rounded-xl shadow-lg transition-all transform hover:scale-105">
+                <input type="text" id="room-id-input" placeholder="방 코드 (4자리)" class="w-1/2 px-4 py-2 md:py-3 rounded-xl text-black font-bold text-base md:text-lg text-center outline-none focus:ring-4 ring-purple-400">
+                <button onclick="window.joinPvPRoom()" class="w-1/2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-jua text-lg md:text-2xl py-2 md:py-3 rounded-xl shadow-lg transition-all transform hover:scale-105">
                     방 참여하기
                 </button>
             </div>
@@ -269,58 +274,64 @@
 
     <!-- 보스 인트로 화면 -->
     <div id="boss-intro-screen">
-        <h1 id="intro-stage-title" class="text-5xl font-jua text-yellow-400 mb-6 drop-shadow-lg">스테이지 1</h1>
+        <h1 id="intro-stage-title" class="text-4xl md:text-5xl font-jua text-yellow-400 mb-6 drop-shadow-lg">스테이지 1</h1>
         <div class="bg-black/50 p-4 rounded-2xl border-2 border-red-500/50 mb-8 flex flex-col items-center shadow-xl">
             <h3 class="text-red-400 font-bold mb-3">⚠️ 적군 덱 구성 미리보기</h3>
-            <div id="enemy-deck-preview" class="flex gap-3"></div>
+            <div id="enemy-deck-preview" class="flex flex-wrap justify-center gap-2 md:gap-3 max-w-sm"></div>
         </div>
         <div class="boss-image-container mb-8">
-            <img id="boss-image" src="" alt="Boss" class="h-64 object-contain filter drop-shadow-[0_0_15px_rgba(239,68,68,0.8)]">
+            <img id="boss-image" src="" alt="Boss" class="h-40 md:h-64 object-contain filter drop-shadow-[0_0_15px_rgba(239,68,68,0.8)]">
         </div>
-        <div class="w-full max-w-2xl bg-slate-900/90 border-4 border-slate-600 p-6 rounded-2xl shadow-2xl relative cursor-pointer hover:bg-slate-800/90 transition-colors" onclick="nextDialogue()">
-            <div class="absolute -top-5 left-6 bg-red-600 text-white font-jua px-4 py-1 rounded-lg border-2 border-red-400 shadow-md">적 보스</div>
-            <p id="boss-dialogue" class="text-2xl font-jua text-white mt-2 leading-relaxed min-h-[80px] flex items-center"></p>
-            <div class="absolute bottom-3 right-4 text-yellow-400 animate-pulse text-sm">▶ 화면을 클릭하여 진행</div>
+        <div class="w-full max-w-2xl bg-slate-900/90 border-4 border-slate-600 p-6 rounded-2xl shadow-2xl relative cursor-pointer hover:bg-slate-800/90 transition-colors" onclick="window.nextDialogue()">
+            <div class="absolute -top-4 md:-top-5 left-6 bg-red-600 text-white font-jua px-3 md:px-4 py-1 rounded-lg border-2 border-red-400 shadow-md text-sm md:text-base">적 보스</div>
+            <p id="boss-dialogue" class="text-xl md:text-2xl font-jua text-white mt-2 leading-relaxed min-h-[60px] md:min-h-[80px] flex items-center"></p>
+            <div class="absolute bottom-3 right-4 text-yellow-400 animate-pulse text-xs md:text-sm">▶ 화면을 클릭하여 진행</div>
         </div>
     </div>
 
-    <!-- PVP 대기방 (블루 vs 레드) -->
+    <!-- PVP 대기방 -->
     <div id="pvp-lobby-screen">
-        <h1 class="text-6xl font-jua text-yellow-400 mb-4 drop-shadow-lg">PVP 대기방</h1>
-        <p class="text-2xl font-bold bg-slate-800 px-6 py-2 rounded-lg border border-slate-500 mb-10 shadow-md">방 코드: <span id="lobby-room-code" class="text-yellow-400 text-3xl ml-2"></span></p>
+        <h1 class="text-4xl md:text-6xl font-jua text-yellow-400 mb-4 drop-shadow-lg mt-8">PVP 대기방</h1>
+        <p class="text-lg md:text-2xl font-bold bg-slate-800 px-4 md:px-6 py-2 md:py-3 rounded-lg border-2 border-slate-500 mb-8 shadow-md">방 코드: <span id="lobby-room-code" class="text-yellow-400 text-3xl md:text-5xl ml-2 md:ml-4 tracking-widest bg-black px-3 md:px-4 py-1 md:py-2 rounded-xl"></span></p>
         
-        <div class="flex w-full max-w-4xl justify-between gap-8">
-            <!-- 블루 진영 (호스트) -->
-            <div class="flex-1 bg-blue-900/40 border-4 border-blue-500 rounded-3xl p-8 flex flex-col items-center shadow-2xl relative overflow-hidden">
+        <div class="flex flex-col md:flex-row w-full max-w-4xl justify-center items-center gap-4 md:gap-8 mb-8">
+            <!-- 블루 진영 -->
+            <div class="w-full md:flex-1 bg-blue-900/40 border-4 border-blue-500 rounded-3xl p-4 md:p-8 flex flex-col items-center shadow-2xl relative overflow-hidden">
                 <div class="absolute top-0 w-full h-2 bg-blue-400"></div>
-                <h2 class="text-3xl font-jua text-blue-300 mb-6 drop-shadow-md">블루 진영 (호스트)</h2>
-                <div class="w-24 h-24 bg-blue-800 rounded-full flex items-center justify-center text-4xl mb-4 border-2 border-blue-400">🛡️</div>
-                <p id="host-name-display" class="text-2xl font-bold mb-8 text-white">대기중...</p>
-                <div id="host-ready-badge" class="bg-gray-600 text-white px-8 py-3 rounded-full font-bold text-xl transition-all shadow-inner">준비 중</div>
+                <h2 class="text-xl md:text-3xl font-jua text-blue-300 mb-4 drop-shadow-md">블루 진영 (나)</h2>
+                <div class="w-16 h-16 md:w-24 md:h-24 bg-blue-800 rounded-full flex items-center justify-center text-3xl md:text-4xl mb-2 border-2 border-blue-400">🛡️</div>
+                <p id="host-name-display" class="text-xl md:text-2xl font-bold mb-4 text-white">대기중...</p>
+                <div id="host-ready-badge" class="bg-gray-600 text-white px-6 md:px-8 py-2 md:py-3 rounded-full font-bold text-sm md:text-xl transition-all shadow-inner">준비 중</div>
             </div>
             
-            <div class="flex items-center text-6xl font-jua text-yellow-500 drop-shadow-lg italic px-4">VS</div>
+            <div class="text-4xl md:text-6xl font-jua text-yellow-500 drop-shadow-lg italic py-2 md:px-4">VS</div>
 
-            <!-- 레드 진영 (도전자) -->
-            <div class="flex-1 bg-red-900/40 border-4 border-red-500 rounded-3xl p-8 flex flex-col items-center shadow-2xl relative overflow-hidden">
+            <!-- 레드 진영 -->
+            <div class="w-full md:flex-1 bg-red-900/40 border-4 border-red-500 rounded-3xl p-4 md:p-8 flex flex-col items-center shadow-2xl relative overflow-hidden">
                 <div class="absolute top-0 w-full h-2 bg-red-400"></div>
-                <h2 class="text-3xl font-jua text-red-300 mb-6 drop-shadow-md">레드 진영 (도전자)</h2>
-                <div class="w-24 h-24 bg-red-800 rounded-full flex items-center justify-center text-4xl mb-4 border-2 border-red-400">⚔️</div>
-                <p id="guest-name-display" class="text-2xl font-bold mb-8 text-white">대기중...</p>
-                <div id="guest-ready-badge" class="bg-gray-600 text-white px-8 py-3 rounded-full font-bold text-xl transition-all shadow-inner">준비 중</div>
+                <h2 class="text-xl md:text-3xl font-jua text-red-300 mb-4 drop-shadow-md">레드 진영 (상대)</h2>
+                <div class="w-16 h-16 md:w-24 md:h-24 bg-red-800 rounded-full flex items-center justify-center text-3xl md:text-4xl mb-2 border-2 border-red-400">⚔️</div>
+                <p id="guest-name-display" class="text-xl md:text-2xl font-bold mb-4 text-white">대기중...</p>
+                <div id="guest-ready-badge" class="bg-gray-600 text-white px-6 md:px-8 py-2 md:py-3 rounded-full font-bold text-sm md:text-xl transition-all shadow-inner">준비 중</div>
+                
+                <!-- AI 초대 버튼 -->
+                <button id="invite-ai-btn" onclick="window.inviteAI()" class="mt-4 hidden bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-bold py-1 px-3 rounded-full shadow border border-indigo-300 transition-colors">🤖 AI 상대 초대</button>
             </div>
         </div>
         
-        <button id="pvp-ready-btn" onclick="toggleReady()" class="mt-12 bg-yellow-500 hover:bg-yellow-400 text-black font-jua text-4xl py-5 px-20 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.5)] transition-transform hover:scale-105 border-4 border-yellow-600">준비 완료</button>
-        <button onclick="cancelMatchmaking()" class="mt-8 text-gray-400 hover:text-white font-jua text-xl underline decoration-gray-500 transition-colors">방 나가기</button>
+        <div class="flex flex-col sm:flex-row gap-4 md:gap-6 mt-4 w-full px-8 md:w-auto">
+            <button id="pvp-ready-btn" onclick="window.toggleReady()" class="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-400 text-black font-jua text-2xl md:text-4xl py-3 md:py-5 px-8 md:px-16 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.5)] transition-transform hover:scale-105 border-4 border-yellow-600">준비 완료</button>
+            <button id="pvp-start-btn" onclick="window.hostStartGame()" class="hidden w-full sm:w-auto bg-red-500 hover:bg-red-400 text-white font-jua text-2xl md:text-4xl py-3 md:py-5 px-8 md:px-16 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.5)] transition-transform hover:scale-105 border-4 border-red-600">게임 시작!</button>
+        </div>
+        <button onclick="window.cancelMatchmaking()" class="mt-6 md:mt-8 text-gray-400 hover:text-white font-jua text-lg md:text-xl underline decoration-gray-500 transition-colors">방 나가기</button>
     </div>
 
     <!-- 전투 화면 -->
     <div id="battle-screen">
         <div id="battle-section">
-            <div class="bg-gray-900 text-white p-2 text-center shadow-md z-10 flex justify-between items-center px-6">
+            <div class="bg-gray-900 text-white p-2 text-center shadow-md z-10 flex justify-between items-center px-4 text-sm md:text-base shrink-0">
                 <span id="enemy-name-display" class="font-bold text-red-400">적군 진영</span>
-                <span id="timer" class="text-yellow-400 font-jua text-2xl tracking-wider">02:00</span>
+                <span id="timer" class="text-yellow-400 font-jua text-xl md:text-2xl tracking-wider">02:00</span>
                 <span id="player-name-display" class="font-bold text-blue-400">아군 진영</span>
             </div>
             <div id="battlefield">
@@ -330,44 +341,103 @@
         </div>
         <div id="ui-section">
             <div id="quiz-panel">
-                <div class="flex flex-col mb-4">
-                    <h3 class="font-jua text-2xl text-blue-800 mb-1 flex items-center gap-2">
-                        <span>⚡ 다각형 넓이 퀴즈</span>
+                <div class="flex flex-col mb-2 shrink-0">
+                    <h3 class="font-jua text-lg md:text-2xl text-blue-800 mb-1 flex items-center gap-2">
+                        <span>⚡ 수학 퀴즈</span>
                     </h3>
-                    <div class="text-xs text-gray-500 bg-gray-100 p-2 rounded border border-gray-200">
-                        <span class="text-green-600 font-bold">정답: 엘릭서 +3</span> / <span class="text-red-500 font-bold">오답: 엘릭서 -1</span>
+                    <div class="text-[10px] md:text-xs text-gray-500 bg-gray-100 p-1 md:p-2 rounded border border-gray-200">
+                        <span class="text-green-600 font-bold">정답: 엘릭서 +3</span> / <span class="text-red-500 font-bold">오답: -1</span>
                     </div>
                 </div>
-                <div id="question-text" class="text-center font-bold text-2xl text-gray-800 bg-blue-50 py-8 rounded-xl border-2 border-blue-200 shadow-inner mb-6 flex-grow flex items-center justify-center">문제 로딩중...</div>
-                <div id="answer-buttons" class="grid grid-cols-2 gap-3 mt-auto"></div>
+                <div id="question-text" class="text-center font-bold text-lg md:text-2xl text-gray-800 bg-blue-50 py-4 md:py-8 rounded-xl border-2 border-blue-200 shadow-inner mb-2 md:mb-6 flex-grow flex items-center justify-center">문제 로딩중...</div>
+                <div id="answer-buttons" class="grid grid-cols-2 gap-2 mt-auto shrink-0 pb-2"></div>
             </div>
-            <div class="bg-gray-900 p-4 shadow-inner border-t border-gray-700 flex flex-col justify-end">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="text-pink-400 font-jua text-2xl w-8 text-center" id="elixir-text">0</div>
-                    <div class="elixir-bar-container flex-grow h-5">
+            <div class="bg-gray-900 p-2 md:p-4 shadow-inner border-t border-gray-700 flex flex-col justify-end shrink-0 h-[100px] md:h-[160px]">
+                <div class="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                    <div class="text-pink-400 font-jua text-lg md:text-2xl w-6 md:w-8 text-center" id="elixir-text">0</div>
+                    <div class="elixir-bar-container flex-grow">
                         <div class="elixir-bar" id="elixir-bar" style="width: 0%"></div>
                     </div>
-                    <div class="text-gray-400 text-xs font-bold w-12 text-right">MAX 10</div>
+                    <div class="text-gray-400 text-[10px] md:text-xs font-bold w-10 md:w-12 text-right">MAX 10</div>
                 </div>
-                <div class="flex justify-between gap-2 h-28" id="card-deck"></div>
+                <div class="flex justify-between gap-1 md:gap-2 h-16 md:h-24 w-full" id="card-deck"></div>
             </div>
         </div>
     </div>
     
     <div id="game-over">
-        <h1 id="game-over-title" class="text-7xl font-jua mb-6 text-yellow-400">승리!</h1>
-        <p id="game-over-desc" class="text-2xl mb-8 text-center px-4">지식의 힘으로 적을 물리쳤습니다!</p>
-        <button id="restart-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-full text-2xl shadow-lg transition-transform transform hover:scale-105 font-jua">
+        <h1 id="game-over-title" class="text-5xl md:text-7xl font-jua mb-6 text-yellow-400">승리!</h1>
+        <p id="game-over-desc" class="text-lg md:text-2xl mb-8 text-center px-4">지식의 힘으로 적을 물리쳤습니다!</p>
+        <button id="restart-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 md:py-4 md:px-8 rounded-full text-xl md:text-2xl shadow-lg transition-transform transform hover:scale-105 font-jua">
             다음 스테이지로
         </button>
     </div>
 </div>
 
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const battlefield = document.getElementById('battlefield');
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+// --- 커스텀 Toast 알림 기능 (alert() 대체) ---
+window.showToast = function(msg, isSuccess = false) {
+    const container = document.getElementById('toast-container');
+    const message = document.getElementById('toast-message');
+    
+    message.innerText = msg;
+    message.className = `text-white px-6 py-3 rounded-full shadow-2xl font-jua text-xl md:text-2xl border-2 border-white text-center min-w-[300px] ${isSuccess ? 'bg-green-600' : 'bg-red-600'}`;
+    
+    container.style.opacity = '1';
+    container.style.transform = 'translate(-50%, 20px)';
+    
+    setTimeout(() => {
+        container.style.opacity = '0';
+        container.style.transform = 'translate(-50%, 0)';
+    }, 2500);
+};
+
+
+// --- Firebase Initialization (Firestore, Rule 1, 2, 3 호환) ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+    // Fallback dummy for structure. Real env will use __firebase_config.
+    projectId: "demo-project"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+let currentUser = null;
+
+const initAuth = async () => {
+    try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
+    } catch (e) {
+        console.error("Auth Error:", e);
+        document.getElementById('auth-status').innerText = "인증 실패 (로컬 모드)";
+    }
+};
+
+initAuth();
+
+onAuthStateChanged(auth, (user) => {
+    currentUser = user;
+    const statusEl = document.getElementById('auth-status');
+    if (user) {
+        statusEl.innerText = "서버 연결 완료 🟢";
+        statusEl.classList.replace('text-yellow-300', 'text-green-400');
+        statusEl.classList.remove('animate-pulse');
+        setTimeout(()=> {statusEl.style.opacity = '0';}, 2000);
+    } else {
+        statusEl.innerText = "서버 연결 해제됨 🔴";
+    }
+});
+
+// --- Game Data & State ---
 const icons = {
     eq_triangle: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="50,10 90,90 10,90"/></svg>`, 
     right_triangle: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="20,10 20,90 80,90"/></svg>`, 
@@ -387,19 +457,19 @@ const icons = {
 };
 
 const cardDB = {
-    'archer_1': { id: 'archer_1', name: '정삼각형', cost: 1, type: 'archer', svg: icons.eq_triangle, bg: 'from-green-400 to-green-600', border: 'border-green-300', maxHp: 100, speed: 50, range: 120, damage: 30, cooldown: 0.8, radius: 12, role: '기본 궁수', desc: '[궁수형] 공속과 데미지가 뛰어납니다. (속도형 적에게는 화살 데미지 반감)' },
-    'archer_2': { id: 'archer_2', name: '직각삼각형', cost: 2, type: 'archer', svg: icons.right_triangle, bg: 'from-green-500 to-green-700', border: 'border-green-400', maxHp: 180, speed: 50, range: 130, damage: 50, cooldown: 0.7, radius: 14, role: '중급 궁수', desc: '[궁수형] 직각의 예리함으로 적을 꿰뚫습니다. (속도형 적에게 데미지 반감)' },
-    'archer_3': { id: 'archer_3', name: '이등변삼각형', cost: 3, type: 'archer', svg: icons.iso_triangle, bg: 'from-emerald-600 to-emerald-800', border: 'border-emerald-400', maxHp: 250, speed: 50, range: 140, damage: 80, cooldown: 0.6, radius: 15, role: '고급 궁수', desc: '[궁수형] 긴 사거리와 파괴력을 가졌습니다. (속도형 적에게 데미지 반감)' },
-    'tank_1': { id: 'tank_1', name: '정사각형', cost: 1, type: 'tank', svg: icons.square, bg: 'from-blue-400 to-blue-600', border: 'border-blue-300', maxHp: 300, speed: 30, range: 25, damage: 25, cooldown: 1.5, radius: 15, role: '기본 방패', desc: '[방패형] 튼튼한 체력으로 앞장섭니다. (타워 공격 시 2배의 피해를 입힙니다)' },
-    'tank_2': { id: 'tank_2', name: '직사각형', cost: 2, type: 'tank', svg: icons.rectangle, bg: 'from-blue-500 to-blue-700', border: 'border-blue-400', maxHp: 600, speed: 30, range: 25, damage: 45, cooldown: 1.3, radius: 18, role: '중급 방패', desc: '[방패형] 더 넓은 체력을 보유한 기사입니다. (타워 공격 시 데미지 2배)' },
-    'tank_3': { id: 'tank_3', name: '사다리꼴', cost: 3, type: 'tank', svg: icons.trapezoid, bg: 'from-indigo-600 to-indigo-800', border: 'border-indigo-400', maxHp: 1000, speed: 30, range: 25, damage: 70, cooldown: 1.1, radius: 20, role: '고급 방패', desc: '[방패형] 막강한 체력과 근접 공격력을 가졌습니다. (타워 공격 시 데미지 2배)' },
-    'speed_1': { id: 'speed_1', name: '평행사변형', cost: 1, type: 'speed', svg: icons.parallelogram, bg: 'from-yellow-400 to-yellow-600', border: 'border-yellow-300', maxHp: 150, speed: 70, range: 25, damage: 35, cooldown: 1.0, radius: 14, role: '기본 속도', desc: '[속도형] 빠르게 접근합니다. (궁수에게 강함 - 화살 피해를 50%만 받습니다)' },
-    'speed_2': { id: 'speed_2', name: '마름모', cost: 4, type: 'assassin', svg: icons.rhombus, bg: 'from-orange-500 to-orange-700', border: 'border-orange-400', maxHp: 400, speed: 80, range: 150, damage: 100, cooldown: 1.2, radius: 18, role: '기습 암살', desc: '[속도형] 마법사나 궁수를 발견하면 주변으로 순간이동(점프)하여 암살합니다!' },
-    'mage_1': { id: 'mage_1', name: '원', cost: 5, type: 'mage', svg: icons.circle, bg: 'from-purple-500 to-purple-700', border: 'border-purple-300', maxHp: 350, speed: 25, range: 150, damage: 150, cooldown: 3.0, radius: 20, role: '광역 메테오', desc: '[마법사형] 탱커를 최우선 공격! 범위에 메테오를 떨구고 3초간 불타는 대지를 만듭니다.' },
-    'tower_1': { id: 'tower_1', name: '오각형', cost: 2, type: 'tower', svg: icons.pentagon, bg: 'from-gray-500 to-gray-700', border: 'border-gray-400', maxHp: 800, speed: 0, range: 130, damage: 50, cooldown: 0.8, radius: 22, role: '설치형 타워', desc: '[타워형] 첫 타겟을 끝까지 추적하여 방어합니다. (방패병의 공격에 매우 약함)' },
-    'giant_1': { id: 'giant_1', name: '육각형', cost: 4, type: 'giant', svg: icons.hexagon, bg: 'from-stone-600 to-stone-800', border: 'border-stone-400', maxHp: 1800, speed: 15, range: 30, damage: 100, cooldown: 2.5, radius: 24, role: '거인', desc: '[거인형] 막대한 체력을 지녔지만 이동속도가 매우 느립니다.' },
-    'giant_2': { id: 'giant_2', name: '십이각형', cost: 6, type: 'giant_aoe', svg: icons.dodecagon, bg: 'from-red-800 to-black', border: 'border-red-600', maxHp: 2800, speed: 12, range: 40, damage: 150, cooldown: 3.0, radius: 30, role: '대형(광역)', desc: '[거인형] 공격 시 육중한 발구르기로 주변의 모든 적과 타워에 광역 피해를 줍니다.' },
-    'healer_1': { id: 'healer_1', name: '별표', cost: 2, type: 'healer', svg: icons.star, bg: 'from-pink-400 to-pink-600', border: 'border-pink-300', maxHp: 400, speed: 45, range: 50, damage: 40, cooldown: 1.0, radius: 18, role: '타워 회복', desc: '[힐러형] 자신의 체력을 깎으며 상처 입은 아군 타워를 지속적으로 수리합니다.' }
+    'archer_1': { id: 'archer_1', name: '정삼각형', cost: 1, type: 'archer', svg: icons.eq_triangle, bg: 'from-green-400 to-green-600', border: 'border-green-300', maxHp: 100, speed: 50, range: 120, damage: 30, cooldown: 0.8, radius: 12, role: '기본 궁수', desc: '공속과 데미지가 뛰어납니다.' },
+    'archer_2': { id: 'archer_2', name: '직각삼각형', cost: 2, type: 'archer', svg: icons.right_triangle, bg: 'from-green-500 to-green-700', border: 'border-green-400', maxHp: 180, speed: 50, range: 130, damage: 50, cooldown: 0.7, radius: 14, role: '중급 궁수', desc: '직각의 예리함으로 적을 꿰뚫습니다.' },
+    'archer_3': { id: 'archer_3', name: '이등변삼각형', cost: 3, type: 'archer', svg: icons.iso_triangle, bg: 'from-emerald-600 to-emerald-800', border: 'border-emerald-400', maxHp: 250, speed: 50, range: 140, damage: 80, cooldown: 0.6, radius: 15, role: '고급 궁수', desc: '긴 사거리와 파괴력을 가졌습니다.' },
+    'tank_1': { id: 'tank_1', name: '정사각형', cost: 1, type: 'tank', svg: icons.square, bg: 'from-blue-400 to-blue-600', border: 'border-blue-300', maxHp: 300, speed: 30, range: 25, damage: 25, cooldown: 1.5, radius: 15, role: '기본 방패', desc: '튼튼한 체력으로 앞장섭니다.' },
+    'tank_2': { id: 'tank_2', name: '직사각형', cost: 2, type: 'tank', svg: icons.rectangle, bg: 'from-blue-500 to-blue-700', border: 'border-blue-400', maxHp: 600, speed: 30, range: 25, damage: 45, cooldown: 1.3, radius: 18, role: '중급 방패', desc: '더 넓은 체력을 보유한 기사입니다.' },
+    'tank_3': { id: 'tank_3', name: '사다리꼴', cost: 3, type: 'tank', svg: icons.trapezoid, bg: 'from-indigo-600 to-indigo-800', border: 'border-indigo-400', maxHp: 1000, speed: 30, range: 25, damage: 70, cooldown: 1.1, radius: 20, role: '고급 방패', desc: '막강한 체력과 근접 공격력을 가졌습니다.' },
+    'speed_1': { id: 'speed_1', name: '평행사변형', cost: 1, type: 'speed', svg: icons.parallelogram, bg: 'from-yellow-400 to-yellow-600', border: 'border-yellow-300', maxHp: 150, speed: 70, range: 25, damage: 35, cooldown: 1.0, radius: 14, role: '기본 속도', desc: '빠르게 접근합니다.' },
+    'speed_2': { id: 'speed_2', name: '마름모', cost: 4, type: 'assassin', svg: icons.rhombus, bg: 'from-orange-500 to-orange-700', border: 'border-orange-400', maxHp: 400, speed: 80, range: 150, damage: 100, cooldown: 1.2, radius: 18, role: '기습 암살', desc: '마법사나 궁수 주변으로 점프해 암살합니다!' },
+    'mage_1': { id: 'mage_1', name: '원', cost: 5, type: 'mage', svg: icons.circle, bg: 'from-purple-500 to-purple-700', border: 'border-purple-300', maxHp: 350, speed: 25, range: 150, damage: 150, cooldown: 3.0, radius: 20, role: '광역 메테오', desc: '탱커를 노려 메테오를 떨구고 불타는 대지를 만듭니다.' },
+    'tower_1': { id: 'tower_1', name: '오각형', cost: 2, type: 'tower', svg: icons.pentagon, bg: 'from-gray-500 to-gray-700', border: 'border-gray-400', maxHp: 800, speed: 0, range: 130, damage: 50, cooldown: 0.8, radius: 22, role: '설치형 타워', desc: '첫 타겟을 끝까지 추적하여 방어합니다.' },
+    'giant_1': { id: 'giant_1', name: '육각형', cost: 4, type: 'giant', svg: icons.hexagon, bg: 'from-stone-600 to-stone-800', border: 'border-stone-400', maxHp: 1800, speed: 15, range: 30, damage: 100, cooldown: 2.5, radius: 24, role: '거인', desc: '막대한 체력을 지녔지만 매우 느립니다.' },
+    'giant_2': { id: 'giant_2', name: '십이각형', cost: 6, type: 'giant_aoe', svg: icons.dodecagon, bg: 'from-red-800 to-black', border: 'border-red-600', maxHp: 2800, speed: 12, range: 40, damage: 150, cooldown: 3.0, radius: 30, role: '대형(광역)', desc: '공격 시 발구르기로 주변에 광역 피해를 줍니다.' },
+    'healer_1': { id: 'healer_1', name: '별표', cost: 2, type: 'healer', svg: icons.star, bg: 'from-pink-400 to-pink-600', border: 'border-pink-300', maxHp: 400, speed: 45, range: 50, damage: 40, cooldown: 1.0, radius: 18, role: '타워 회복', desc: '자신의 체력을 깎으며 아군 타워를 지속 수리합니다.' }
 };
 
 const sortedCardKeys = Object.keys(cardDB).sort((a, b) => cardDB[a].cost - cardDB[b].cost);
@@ -410,17 +480,16 @@ const stageData = [
     { id: 3, deckSize: 6, bossImg: "https://i.imgur.com/N4pxjYu.png", dialogues: ["감히... 내 부하들을 해치우다니", "마지막 승부다, 최고의 덱을 구성해왔겠지?"], enemyDeck: ['archer_3', 'tank_3', 'mage_1', 'giant_1', 'giant_2', 'tower_1'] }
 ];
 
-let currentMode = 1; 
+let gameMode = 'stage'; // 'stage' or 'pvp'
+let currentStage = 1; 
 let maxUnlockedStage = 3; 
 let maxDeckSize = stageData[0].deckSize;
 
 let unlockedCards = ['archer_1', 'tank_1', 'speed_1', 'tower_1']; 
 let myDeck = ['archer_1', 'tank_1', 'speed_1', 'tower_1']; 
 
-const loadedImages = {};
-const loadedImagesPlayer = {};
-const loadedImagesEnemy = {};
-
+// --- Graphics & SVGs ---
+const loadedImages = {}; const loadedImagesPlayer = {}; const loadedImagesEnemy = {};
 function preloadSVGs() {
     for(let key in cardDB) {
         let baseSvg = cardDB[key].svg;
@@ -444,11 +513,9 @@ function preloadSVGs() {
         let baseSvg = icons[t];
         if (!baseSvg.includes('xmlns')) baseSvg = baseSvg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" ');
         let styledSvg = baseSvg.replace('<svg ', '<svg stroke="black" stroke-width="3" stroke-linejoin="round" ');
-
         let pSvg = styledSvg.replace(/currentColor/g, '#3b82f6');
         let pImg = new Image(); pImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pSvg);
         loadedImagesPlayer[t] = pImg;
-
         let eSvg = styledSvg.replace(/currentColor/g, '#ef4444');
         let eImg = new Image(); eImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(eSvg);
         loadedImagesEnemy[t] = eImg;
@@ -456,46 +523,60 @@ function preloadSVGs() {
 }
 preloadSVGs();
 
-function showScreen(screenId) {
+// --- UI Navigation ---
+window.showScreen = function(screenId) {
     const screens = ['title-screen', 'unlock-screen', 'deck-screen', 'boss-intro-screen', 'pvp-lobby-screen', 'battle-screen'];
     screens.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = (id === screenId) ? 'flex' : 'none';
     });
-}
+    if(screenId === 'battle-screen') resizeCanvas();
+};
 
-function changeMode(dir) {
-    let newMode = currentMode + dir;
-    if (newMode >= 0 && newMode <= maxUnlockedStage) {
-        currentMode = newMode;
-        let displayEl = document.getElementById('mode-display');
-        
-        if (currentMode === 0) {
-            displayEl.innerText = "PVP 결투";
-            displayEl.className = "font-jua text-4xl text-center text-red-400 w-48";
-            document.getElementById('stage-controls').classList.add('hidden');
-            document.getElementById('pvp-controls').classList.remove('hidden');
-            document.getElementById('pvp-controls').classList.add('flex');
-            maxDeckSize = 6;
-        } else {
-            displayEl.innerText = `스테이지 ${currentMode}`;
-            displayEl.className = "font-jua text-4xl text-center text-yellow-400 w-48";
-            document.getElementById('pvp-controls').classList.add('hidden');
-            document.getElementById('pvp-controls').classList.remove('flex');
-            document.getElementById('stage-controls').classList.remove('hidden');
-            maxDeckSize = stageData[currentMode-1].deckSize;
-        }
-        
+window.openDeckForStage = function() {
+    gameMode = 'stage';
+    document.getElementById('pvp-controls').classList.add('hidden');
+    document.getElementById('pvp-controls').classList.remove('flex');
+    document.getElementById('stage-controls').classList.remove('hidden');
+    document.getElementById('stage-selector').style.display = 'flex';
+    window.changeStage(0); 
+    window.showScreen('deck-screen');
+};
+
+window.openDeckForPvP = function() {
+    gameMode = 'pvp';
+    maxDeckSize = 6;
+    let displayEl = document.getElementById('mode-display');
+    displayEl.innerText = "PVP 결투";
+    displayEl.className = "font-jua text-2xl md:text-4xl text-center text-red-400 w-32 md:w-48";
+    
+    document.getElementById('stage-selector').style.display = 'none'; // pvp에선 화살표 숨김
+    document.getElementById('stage-controls').classList.add('hidden');
+    document.getElementById('pvp-controls').classList.remove('hidden');
+    document.getElementById('pvp-controls').classList.add('flex');
+    
+    if (myDeck.length > maxDeckSize) myDeck = myDeck.slice(0, maxDeckSize);
+    renderDeckScreen();
+    window.showScreen('deck-screen');
+};
+
+window.changeStage = function(dir) {
+    let newStage = currentStage + dir;
+    if (newStage >= 1 && newStage <= maxUnlockedStage) {
+        currentStage = newStage;
+        document.getElementById('mode-display').innerText = `스테이지 ${currentStage}`;
+        document.getElementById('mode-display').className = "font-jua text-2xl md:text-4xl text-center text-yellow-400 w-32 md:w-48";
+        maxDeckSize = stageData[currentStage-1].deckSize;
         if (myDeck.length > maxDeckSize) myDeck = myDeck.slice(0, maxDeckSize);
         renderDeckScreen();
     }
-}
+};
 
 function createCardHTML(card, onClickFn, isSelected = false) {
     const selectedClass = isSelected ? 'in-deck' : '';
     return `
         <div class="deck-card text-white bg-gradient-to-b ${card.bg} border-[3px] ${card.border} ${selectedClass}" 
-             onclick="${onClickFn}('${card.id}')" title="${card.desc}">
+             onclick="window.${onClickFn}('${card.id}')" title="${card.desc}">
             <div class="absolute top-0 left-0 bg-pink-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded-br-lg z-10">${card.cost} 💧</div>
             ${card.svg}
             <div class="text-white text-[9px] md:text-[10px] font-bold text-center leading-tight w-full truncate px-1">${card.name}</div>
@@ -504,7 +585,7 @@ function createCardHTML(card, onClickFn, isSelected = false) {
 }
 
 function renderDeckScreen() {
-    document.getElementById('deck-count').innerText = `${myDeck.length}/${maxDeckSize}`;
+    document.getElementById('deck-count-indicator').innerText = `${myDeck.length}/${maxDeckSize}`;
     const myDeckContainer = document.getElementById('my-deck-grid');
     const inventoryContainer = document.getElementById('inventory-grid');
     
@@ -523,234 +604,38 @@ function renderDeckScreen() {
             const disabledClass = isSelected ? 'disabled' : '';
             invHTML += `
                 <div class="deck-card text-white bg-gradient-to-b ${card.bg} border-[3px] ${card.border} ${disabledClass}" 
-                     onclick="addToDeck('${id}')" title="${card.desc}">
+                     onclick="window.addToDeck('${id}')" title="${card.desc}">
                     <div class="absolute top-0 left-0 bg-pink-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded-br-lg z-10">${card.cost} 💧</div>
                     ${card.svg}
                     <div class="text-white text-[9px] md:text-[10px] font-bold text-center leading-tight px-1">${card.name}</div>
-                    ${isSelected ? '<div class="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center font-bold text-yellow-400 text-sm border-2 border-yellow-400">장착됨</div>' : ''}
+                    ${isSelected ? '<div class="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center font-bold text-yellow-400 text-xs md:text-sm border-2 border-yellow-400">장착됨</div>' : ''}
                 </div>
             `;
         } else {
             invHTML += `
                 <div class="deck-card text-white bg-slate-800 border-[3px] border-slate-700 opacity-60 cursor-not-allowed">
-                    <div class="text-2xl mb-2 text-gray-500">🔒</div>
+                    <div class="text-xl md:text-2xl mb-1 md:mb-2 text-gray-500">🔒</div>
                     <div class="text-gray-400 text-[9px] md:text-[10px] font-bold text-center px-1">잠김</div>
                 </div>
             `;
         }
     }
     inventoryContainer.innerHTML = invHTML;
-    const startBtn = document.getElementById('start-battle-btn');
-    if(startBtn) startBtn.disabled = myDeck.length !== maxDeckSize;
 }
 
-function addToDeck(cardId) {
+window.addToDeck = function(cardId) {
     if (myDeck.includes(cardId) || myDeck.length >= maxDeckSize || !unlockedCards.includes(cardId)) return;
     myDeck.push(cardId); renderDeckScreen();
-}
+};
 
-function removeFromDeck(cardId) {
+window.removeFromDeck = function(cardId) {
     myDeck = myDeck.filter(id => id !== cardId); renderDeckScreen();
-}
+};
 
-
-// --- 스테이지 보스전 ---
-let dialogueIndex = 0;
-
-function startBossIntro() {
-    if (myDeck.length !== maxDeckSize) return;
-    window.isMultiplayer = false;
-    document.getElementById('player-name-display').innerText = "아군 진영";
-    document.getElementById('enemy-name-display').innerText = "적 보스";
-    
-    showScreen('boss-intro-screen');
-    const stageInfo = stageData[currentMode-1];
-    
-    document.getElementById('intro-stage-title').innerText = `스테이지 ${currentMode}`;
-    document.getElementById('boss-image').src = stageInfo.bossImg;
-    
-    const enemyDeckContainer = document.getElementById('enemy-deck-preview');
-    enemyDeckContainer.innerHTML = stageInfo.enemyDeck.map(id => {
-        const card = cardDB[id];
-        return `
-            <div class="w-12 h-16 md:w-16 md:h-20 bg-gradient-to-b ${card.bg} rounded-lg border-2 ${card.border} flex flex-col items-center justify-center shadow-md">
-                <div class="w-6 h-6 md:w-8 md:h-8 text-white">${card.svg}</div>
-            </div>
-        `;
-    }).join('');
-
-    dialogueIndex = 0; showDialogue();
-}
-
-function showDialogue() {
-    const dialogues = stageData[currentMode-1].dialogues;
-    if (dialogueIndex < dialogues.length) {
-        document.getElementById('boss-dialogue').innerText = dialogues[dialogueIndex];
-    } else {
-        showScreen('battle-screen'); renderBattleDeck();
-        initGame(stageData[currentMode-1].enemyDeck); 
-    }
-}
-
-function nextDialogue() { dialogueIndex++; showDialogue(); }
-
-
-// --- ★ PVP 멀티플레이 로직 (Firebase) ★ ---
-let myNickname = "";
-let roomCode = "";
-window.isReady = false;
-
-function createPvPRoom() {
-    if(myDeck.length !== maxDeckSize) return alert(`덱을 ${maxDeckSize}장 꽉 채워주세요!`);
-    if(!window.firebaseDB) return alert("HTML 상단에 파이어베이스 설정값을 올바르게 입력해주세요.");
-
-    myNickname = document.getElementById('nickname-input').value || "방장";
-    roomCode = Math.floor(1000 + Math.random() * 9000).toString(); 
-    
-    const matchRef = window.firebaseRef(window.firebaseDB, `matches/${roomCode}`);
-    window.firebaseSet(matchRef, {
-        waiting: true,
-        hostName: myNickname,
-        hostReady: false,
-        guestReady: false,
-        started: false
-    }).then(() => {
-        window.isHost = true;
-        window.isMultiplayer = true;
-        window.multiplayerStarted = false;
-        window.isReady = false;
-        
-        setupPvPLobbyUI();
-        window.firebaseOnDisconnect(matchRef).remove(); 
-        setupMatchListener(matchRef);
-    }).catch(e => alert("방 생성 실패: " + e));
-}
-
-function joinPvPRoom() {
-    if(myDeck.length !== maxDeckSize) return alert(`덱을 ${maxDeckSize}장 꽉 채워주세요!`);
-    if(!window.firebaseDB) return alert("파이어베이스 설정값을 확인해주세요.");
-    
-    roomCode = document.getElementById('room-id-input').value;
-    if(!roomCode) return alert("방 코드를 입력해주세요!");
-    
-    myNickname = document.getElementById('nickname-input').value || "도전자";
-    
-    const matchRef = window.firebaseRef(window.firebaseDB, `matches/${roomCode}`);
-    
-    window.firebaseUpdate(matchRef, {
-        waiting: false,
-        guestName: myNickname
-    }).then(() => {
-        window.isHost = false;
-        window.isMultiplayer = true;
-        window.multiplayerStarted = false;
-        window.isReady = false;
-        
-        setupPvPLobbyUI();
-        setupMatchListener(matchRef);
-    }).catch(e => alert("방을 찾을 수 없거나 이미 꽉 찼습니다."));
-}
-
-function setupPvPLobbyUI() {
-    showScreen('pvp-lobby-screen');
-    document.getElementById('lobby-room-code').innerText = roomCode;
-    
-    const btn = document.getElementById('pvp-ready-btn');
-    btn.innerText = "준비 완료";
-    btn.className = "mt-12 bg-yellow-500 hover:bg-yellow-400 text-black font-jua text-4xl py-5 px-20 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.5)] transition-transform hover:scale-105 border-4 border-yellow-600";
-}
-
-function toggleReady() {
-    if (!window.firebaseDB || !roomCode) return;
-    window.isReady = !window.isReady;
-    
-    const btn = document.getElementById('pvp-ready-btn');
-    if (window.isReady) {
-        btn.innerText = "준비 취소";
-        btn.className = "mt-12 bg-green-500 hover:bg-green-400 text-white font-jua text-4xl py-5 px-20 rounded-full shadow-[0_0_20px_rgba(34,197,94,0.5)] transition-transform hover:scale-105 border-4 border-green-600";
-    } else {
-        btn.innerText = "준비 완료";
-        btn.className = "mt-12 bg-yellow-500 hover:bg-yellow-400 text-black font-jua text-4xl py-5 px-20 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.5)] transition-transform hover:scale-105 border-4 border-yellow-600";
-    }
-
-    const matchRef = window.firebaseRef(window.firebaseDB, `matches/${roomCode}`);
-    window.firebaseUpdate(matchRef, window.isHost ? { hostReady: window.isReady } : { guestReady: window.isReady });
-}
-
-function setupMatchListener(matchRef) {
-    window.firebaseOnValue(matchRef, (snapshot) => {
-        const data = snapshot.val();
-        if (!data) {
-            if (!window.isHost && !window.multiplayerStarted) {
-                alert("호스트가 방을 나갔습니다.");
-                cancelMatchmaking();
-            }
-            return;
-        }
-        
-        document.getElementById('host-name-display').innerText = data.hostName || "대기중...";
-        document.getElementById('guest-name-display').innerText = data.guestName || "대기중...";
-
-        const hostBadge = document.getElementById('host-ready-badge');
-        hostBadge.innerText = data.hostReady ? "READY!" : "준비 중";
-        hostBadge.className = data.hostReady ? "bg-blue-500 text-white px-8 py-3 rounded-full font-bold text-xl shadow-lg border-2 border-white" : "bg-gray-600 text-white px-8 py-3 rounded-full font-bold text-xl shadow-inner";
-
-        const guestBadge = document.getElementById('guest-ready-badge');
-        guestBadge.innerText = data.guestReady ? "READY!" : "준비 중";
-        guestBadge.className = data.guestReady ? "bg-red-500 text-white px-8 py-3 rounded-full font-bold text-xl shadow-lg border-2 border-white" : "bg-gray-600 text-white px-8 py-3 rounded-full font-bold text-xl shadow-inner";
-
-        if (window.isHost && data.hostReady && data.guestReady && !data.started) {
-            window.firebaseUpdate(matchRef, { started: true });
-        }
-
-        if (data.started && !window.multiplayerStarted) {
-            startGameMultiplayer(data.hostName, data.guestName); 
-        }
-    });
-}
-
-function cancelMatchmaking() {
-    if(roomCode && window.isHost && window.firebaseDB) {
-        window.firebaseSet(window.firebaseRef(window.firebaseDB, `matches/${roomCode}`), null);
-    }
-    roomCode = "";
-    window.isMultiplayer = false;
-    showScreen('deck-screen');
-}
-
-function startGameMultiplayer(hostName, guestName) {
-    window.multiplayerStarted = true;
-    showScreen('battle-screen');
-    renderBattleDeck();
-    
-    document.getElementById('player-name-display').innerText = window.isHost ? hostName : guestName;
-    document.getElementById('enemy-name-display').innerText = window.isHost ? guestName : hostName;
-    
-    initGame(Object.keys(cardDB)); 
-
-    // ★ 실시간 스폰 동기화 리스너 등록
-    const spawnRef = window.firebaseRef(window.firebaseDB, `matches/${roomCode}/spawns`);
-    window.firebaseOnChildAdded(spawnRef, (snapshot) => {
-        const data = snapshot.val();
-        let spawnX = data.xRatio * CANVAS_WIDTH;
-        let spawnY = data.yRatio * CANVAS_HEIGHT;
-        let isPlayerUnit = (data.isHost === window.isHost);
-        
-        // 게스트의 경우, 호스트가 보낸 좌표를 상하/좌우 반전하여 적진(위쪽)에서 스폰되게 처리
-        if (!window.isHost) {
-            spawnX = (1 - data.xRatio) * CANVAS_WIDTH;
-            spawnY = (1 - data.yRatio) * CANVAS_HEIGHT;
-        }
-        
-        entities.push(new Unit(spawnX, spawnY, isPlayerUnit, data.cardId));
-    });
-}
-
-
-// --- 덱 해금 (문제 풀이) ---
+// --- Unlock Problem Logic ---
 let unlockCorrectAnswer = null;
 
-function generateUnlockProblem() {
+window.generateUnlockProblem = function() {
     const lockedCards = sortedCardKeys.filter(id => !unlockedCards.includes(id));
     if (lockedCards.length === 0) {
         document.getElementById('unlock-question').innerText = "🎉 모든 카드를 해금했습니다! 🎉";
@@ -763,16 +648,16 @@ function generateUnlockProblem() {
 
     if (type === 'rectangle') {
         const w = Math.floor(Math.random() * 5) + 2; const h = Math.floor(Math.random() * 5) + 2;
-        question = `가로 ${w}cm, 세로 ${h}cm인 직사각형 넓이는?`; answer = w * h;
+        question = `가로 ${w}cm, 세로 ${h}cm 직사각형 넓이는?`; answer = w * h;
         wrongAnswers = [answer + w, answer - h + 1, answer + 2];
     } else if (type === 'triangle') {
         const b = Math.floor(Math.random() * 4) + 2; let h = Math.floor(Math.random() * 4) + 2;
         if ((b * h) % 2 !== 0) h++;
-        question = `밑변 ${b}cm, 높이 ${h}cm인 삼각형 넓이는?`; answer = (b * h) / 2;
+        question = `밑변 ${b}cm, 높이 ${h}cm 삼각형 넓이는?`; answer = (b * h) / 2;
         wrongAnswers = [answer + 2, answer + b, answer + 1];
     } else if (type === 'parallelogram') {
         const b = Math.floor(Math.random() * 5) + 2; const h = Math.floor(Math.random() * 5) + 2;
-        question = `밑변 ${b}cm, 높이 ${h}cm인 평행사변형 넓이는?`; answer = b * h;
+        question = `밑변 ${b}cm, 높이 ${h}cm 평행사변형 넓이는?`; answer = b * h;
         wrongAnswers = [answer + 2, (b * h)/2, answer + 1];
     }
     wrongAnswers = wrongAnswers.map(ans => Math.max(1, Math.floor(ans)));
@@ -791,14 +676,14 @@ function generateUnlockProblem() {
     btnContainer.innerHTML = '';
     options.forEach(opt => {
         const btn = document.createElement('button');
-        btn.className = "bg-slate-700 border-4 border-slate-500 text-white font-bold py-6 px-4 rounded-2xl text-3xl hover:bg-slate-600 active:bg-emerald-600 transition-colors shadow-lg";
+        btn.className = "bg-slate-700 border-4 border-slate-500 text-white font-bold py-4 md:py-6 px-4 rounded-2xl text-xl md:text-3xl hover:bg-slate-600 active:bg-emerald-600 transition-colors shadow-lg";
         btn.innerText = opt;
-        btn.onclick = () => checkUnlockAnswer(opt, btn);
+        btn.onclick = () => window.checkUnlockAnswer(opt, btn);
         btnContainer.appendChild(btn);
     });
-}
+};
 
-function checkUnlockAnswer(selected, btn) {
+window.checkUnlockAnswer = function(selected, btn) {
     if (selected === unlockCorrectAnswer) {
         btn.classList.replace('bg-slate-700', 'bg-emerald-500');
         btn.classList.replace('border-slate-500', 'border-emerald-400');
@@ -818,15 +703,294 @@ function checkUnlockAnswer(selected, btn) {
         btn.classList.replace('border-slate-500', 'border-red-400');
         btn.disabled = true;
     }
-}
+};
 
-function closeUnlockModal() {
+window.closeUnlockModal = function() {
     document.getElementById('unlock-modal').classList.add('hidden');
-    generateUnlockProblem();
+    window.generateUnlockProblem();
+};
+
+
+// --- Stage Boss Logic ---
+let dialogueIndex = 0;
+
+window.startBossIntro = function() {
+    if (myDeck.length !== maxDeckSize) { window.showToast("덱을 꽉 채워주세요!"); return; }
+    window.isMultiplayer = false;
+    window.isVsAI = false;
+    document.getElementById('player-name-display').innerText = "아군 진영";
+    document.getElementById('enemy-name-display').innerText = "적 보스";
+    
+    window.showScreen('boss-intro-screen');
+    const stageInfo = stageData[currentStage-1];
+    
+    document.getElementById('intro-stage-title').innerText = `스테이지 ${currentStage}`;
+    document.getElementById('boss-image').src = stageInfo.bossImg;
+    
+    const enemyDeckContainer = document.getElementById('enemy-deck-preview');
+    enemyDeckContainer.innerHTML = stageInfo.enemyDeck.map(id => {
+        const card = cardDB[id];
+        return `<div class="w-10 h-14 md:w-16 md:h-20 bg-gradient-to-b ${card.bg} rounded-lg border-2 ${card.border} flex flex-col items-center justify-center shadow-md"><div class="w-6 h-6 md:w-8 md:h-8 text-white">${card.svg}</div></div>`;
+    }).join('');
+
+    dialogueIndex = 0; window.showDialogue();
+};
+
+window.showDialogue = function() {
+    const dialogues = stageData[currentStage-1].dialogues;
+    if (dialogueIndex < dialogues.length) {
+        document.getElementById('boss-dialogue').innerText = dialogues[dialogueIndex];
+    } else {
+        window.showScreen('battle-screen'); renderBattleDeck();
+        initGame(stageData[currentStage-1].enemyDeck); 
+    }
+};
+window.nextDialogue = function() { dialogueIndex++; window.showDialogue(); };
+
+
+// --- ★ PVP 멀티플레이 (Firestore 연동) ★ ---
+let myNickname = "";
+let currentRoomCode = "";
+window.isReady = false;
+let matchUnsubscribe = null;
+let spawnUnsubscribe = null;
+window.matchStartTime = 0;
+
+function generateRoomCode() {
+    return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+window.createPvPRoom = async function() {
+    if(myDeck.length !== maxDeckSize) return window.showToast(`[안내] 덱을 ${maxDeckSize}장 꽉 채워주세요! (현재 ${myDeck.length}장)`);
+    if(!currentUser) return window.showToast("서버 인증 중입니다. 잠시 후 다시 시도해주세요.");
+
+    myNickname = document.getElementById('nickname-input').value || "방장";
+    currentRoomCode = generateRoomCode(); 
+    
+    window.showScreen('pvp-lobby-screen');
+    document.getElementById('lobby-room-code').innerText = "생성 중...";
+    document.getElementById('host-name-display').innerText = myNickname;
+    document.getElementById('guest-name-display').innerText = "대기중...";
+    document.getElementById('pvp-start-btn').classList.add('hidden');
+    document.getElementById('invite-ai-btn').classList.remove('hidden'); // 방장에게만 보임
+
+    try {
+        const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', currentRoomCode);
+        await setDoc(matchRef, {
+            hostId: currentUser.uid,
+            hostName: myNickname,
+            guestId: null,
+            guestName: null,
+            hostReady: false,
+            guestReady: false,
+            started: false,
+            createdAt: Date.now()
+        });
+
+        window.isHost = true;
+        window.isMultiplayer = true;
+        window.isVsAI = false;
+        window.multiplayerStarted = false;
+        window.isReady = false;
+        
+        setupPvPLobbyUI();
+        setupMatchListener(matchRef);
+    } catch (e) {
+        window.showToast("방 생성 실패: " + e.message);
+        window.cancelMatchmaking();
+    }
+};
+
+window.joinPvPRoom = async function() {
+    if(myDeck.length !== maxDeckSize) return window.showToast(`[안내] 덱을 ${maxDeckSize}장 꽉 채워주세요! (현재 ${myDeck.length}장)`);
+    if(!currentUser) return window.showToast("서버 인증 중입니다.");
+    
+    currentRoomCode = document.getElementById('room-id-input').value;
+    if(!currentRoomCode) return window.showToast("방 코드를 입력해주세요!");
+    myNickname = document.getElementById('nickname-input').value || "도전자";
+    
+    window.showScreen('pvp-lobby-screen');
+    document.getElementById('lobby-room-code').innerText = "접속 중...";
+    document.getElementById('invite-ai-btn').classList.add('hidden'); // 도전자에게는 안보임
+
+    try {
+        const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', currentRoomCode);
+        const matchSnap = await getDoc(matchRef);
+        
+        if (!matchSnap.exists() || matchSnap.data().guestId) {
+            throw new Error("방이 없거나 이미 가득 찼습니다.");
+        }
+
+        await updateDoc(matchRef, {
+            guestId: currentUser.uid,
+            guestName: myNickname
+        });
+
+        window.isHost = false;
+        window.isMultiplayer = true;
+        window.isVsAI = false;
+        window.multiplayerStarted = false;
+        window.isReady = false;
+        
+        setupPvPLobbyUI();
+        setupMatchListener(matchRef);
+    } catch (e) {
+        window.showToast(e.message);
+        window.cancelMatchmaking();
+    }
+};
+
+window.inviteAI = async function() {
+    if (!window.isHost || !currentRoomCode || !currentUser) return;
+    try {
+        const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', currentRoomCode);
+        await updateDoc(matchRef, {
+            guestId: "AI_BOT",
+            guestName: "Gemini AI",
+            guestReady: true
+        });
+        window.isVsAI = true; // AI 모드 플래그 활성화
+        document.getElementById('invite-ai-btn').classList.add('hidden');
+    } catch (e) {
+        console.error("AI 초대 실패:", e);
+    }
+};
+
+function setupPvPLobbyUI() {
+    document.getElementById('lobby-room-code').innerText = currentRoomCode;
+    const btn = document.getElementById('pvp-ready-btn');
+    btn.innerText = "준비 완료";
+    btn.className = "w-full sm:w-auto bg-yellow-500 hover:bg-yellow-400 text-black font-jua text-2xl md:text-4xl py-3 md:py-5 px-8 md:px-16 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.5)] transition-transform hover:scale-105 border-4 border-yellow-600";
+}
+
+window.toggleReady = async function() {
+    if (!currentUser || !currentRoomCode) return;
+    window.isReady = !window.isReady;
+    
+    const btn = document.getElementById('pvp-ready-btn');
+    if (window.isReady) {
+        btn.innerText = "준비 취소";
+        btn.className = "w-full sm:w-auto bg-green-500 hover:bg-green-400 text-white font-jua text-2xl md:text-4xl py-3 md:py-5 px-8 md:px-16 rounded-full shadow-[0_0_20px_rgba(34,197,94,0.5)] transition-transform hover:scale-105 border-4 border-green-600";
+    } else {
+        btn.innerText = "준비 완료";
+        btn.className = "w-full sm:w-auto bg-yellow-500 hover:bg-yellow-400 text-black font-jua text-2xl md:text-4xl py-3 md:py-5 px-8 md:px-16 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.5)] transition-transform hover:scale-105 border-4 border-yellow-600";
+    }
+
+    try {
+        const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', currentRoomCode);
+        await updateDoc(matchRef, window.isHost ? { hostReady: window.isReady } : { guestReady: window.isReady });
+    } catch(e) {
+        console.error(e);
+    }
+};
+
+function setupMatchListener(matchRef) {
+    if (matchUnsubscribe) matchUnsubscribe();
+    
+    matchUnsubscribe = onSnapshot(matchRef, (snapshot) => {
+        if (!snapshot.exists()) {
+            if (!window.isHost && !window.multiplayerStarted) {
+                window.showToast("방장이 방을 나갔습니다.");
+                window.cancelMatchmaking();
+            }
+            return;
+        }
+        
+        const data = snapshot.data();
+        
+        document.getElementById('host-name-display').innerText = data.hostName || "대기중...";
+        document.getElementById('guest-name-display').innerText = data.guestName || "대기중...";
+
+        const hostBadge = document.getElementById('host-ready-badge');
+        hostBadge.innerText = data.hostReady ? "READY!" : "준비 중";
+        hostBadge.className = data.hostReady ? "bg-blue-500 text-white px-6 md:px-8 py-2 md:py-3 rounded-full font-bold text-sm md:text-xl shadow-lg border-2 border-white" : "bg-gray-600 text-white px-6 md:px-8 py-2 md:py-3 rounded-full font-bold text-sm md:text-xl shadow-inner";
+
+        const guestBadge = document.getElementById('guest-ready-badge');
+        guestBadge.innerText = data.guestReady ? "READY!" : "준비 중";
+        guestBadge.className = data.guestReady ? "bg-red-500 text-white px-6 md:px-8 py-2 md:py-3 rounded-full font-bold text-sm md:text-xl shadow-lg border-2 border-white" : "bg-gray-600 text-white px-6 md:px-8 py-2 md:py-3 rounded-full font-bold text-sm md:text-xl shadow-inner";
+
+        if (window.isHost && !data.guestId) document.getElementById('invite-ai-btn').classList.remove('hidden');
+        else document.getElementById('invite-ai-btn').classList.add('hidden');
+
+        const startBtn = document.getElementById('pvp-start-btn');
+        if (window.isHost) {
+            if (data.hostReady && data.guestReady) startBtn.classList.remove('hidden');
+            else startBtn.classList.add('hidden');
+        } else {
+            startBtn.classList.add('hidden');
+        }
+
+        if (data.started && !window.multiplayerStarted) {
+            startGameMultiplayer(data.hostName, data.guestName); 
+        }
+    }, (error) => {
+        console.error("Match Listener Error:", error);
+    });
+}
+
+window.hostStartGame = async function() {
+    if (!window.isHost || !currentUser || !currentRoomCode) return;
+    try {
+        const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', currentRoomCode);
+        await updateDoc(matchRef, { started: true });
+    } catch(e) {
+        console.error(e);
+    }
+};
+
+window.cancelMatchmaking = async function() {
+    if(currentRoomCode && window.isHost && currentUser) {
+        try {
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'matches', currentRoomCode));
+        } catch(e){}
+    }
+    if (matchUnsubscribe) { matchUnsubscribe(); matchUnsubscribe = null; }
+    if (spawnUnsubscribe) { spawnUnsubscribe(); spawnUnsubscribe = null; }
+    
+    currentRoomCode = "";
+    window.isMultiplayer = false;
+    window.isVsAI = false;
+    window.showScreen('deck-screen');
+};
+
+function startGameMultiplayer(hostName, guestName) {
+    window.multiplayerStarted = true;
+    window.matchStartTime = Date.now();
+    window.showScreen('battle-screen');
+    renderBattleDeck();
+    
+    document.getElementById('player-name-display').innerText = window.isHost ? hostName : guestName;
+    document.getElementById('enemy-name-display').innerText = window.isHost ? guestName : hostName;
+    
+    initGame(Object.keys(cardDB)); 
+
+    // PVP 스폰 리스너 (Firestore 단순 쿼리 후 클라이언트 필터링)
+    if (!window.isVsAI) {
+        const spawnsCol = collection(db, 'artifacts', appId, 'public', 'data', 'spawns');
+        spawnUnsubscribe = onSnapshot(spawnsCol, (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === 'added') {
+                    const data = change.doc.data();
+                    if (data.roomId === currentRoomCode && data.timestamp >= window.matchStartTime) {
+                        // 남이 보낸 스폰만 처리 (내가 보낸건 로컬에서 이미 생성)
+                        if (data.isHost !== window.isHost) {
+                            let spawnX = data.xRatio * CANVAS_WIDTH;
+                            let spawnY = data.yRatio * CANVAS_HEIGHT;
+                            // 상대 화면 좌표 반전
+                            spawnX = (1 - data.xRatio) * CANVAS_WIDTH;
+                            spawnY = (1 - data.yRatio) * CANVAS_HEIGHT;
+                            
+                            entities.push(new Unit(spawnX, spawnY, false, data.cardId));
+                        }
+                    }
+                }
+            });
+        }, (error) => { console.error("Spawn Listener Error:", error); });
+    }
 }
 
 
-// --- 전투 렌더링 로직 ---
+// --- Battle Logic & UI ---
 let CANVAS_WIDTH, CANVAS_HEIGHT;
 let gameLoopId;
 let lastTime = 0;
@@ -836,17 +1000,18 @@ let elixir = 5.0;
 const MAX_ELIXIR = 10;
 const ELIXIR_GEN_RATE = 0.5;
 
-let entities = [];
-let towers = [];
-let particles = []; 
+let entities = []; let towers = []; let particles = []; 
 let timeRemaining = 120;
 
-let selectedCardIndex = -1;
-let selectedCardCost = 0;
-let windowCurrentSelectedCardId = null;
+let selectedCardIndex = -1; let selectedCardCost = 0; let windowCurrentSelectedCardId = null;
 let currentEnemyDeck = [];
 
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const battlefield = document.getElementById('battlefield');
+
 function resizeCanvas() {
+    if(document.getElementById('battle-screen').style.display !== 'flex') return;
     CANVAS_WIDTH = battlefield.clientWidth;
     CANVAS_HEIGHT = battlefield.clientHeight;
     canvas.width = CANVAS_WIDTH;
@@ -854,6 +1019,74 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 
+function renderBattleDeck() {
+    const deckContainer = document.getElementById('card-deck');
+    deckContainer.innerHTML = myDeck.map((id, idx) => {
+        const card = cardDB[id];
+        return `
+            <div class="card relative w-12 md:w-16 h-16 md:h-24 bg-gradient-to-b ${card.bg} rounded-lg border-2 border-slate-600 shadow-md flex flex-col items-center justify-center overflow-hidden shrink-0"
+                 onclick="window.selectCard(${idx}, ${card.cost}, '${card.id}')">
+                <div class="absolute top-0 left-0 bg-pink-500 text-white text-[10px] md:text-xs font-bold px-1 rounded-br-md">${card.cost}</div>
+                <div class="w-6 h-6 md:w-8 md:h-8 text-white">${card.svg}</div>
+                <div class="text-white text-[8px] md:text-[10px] font-bold text-center mt-1 truncate w-full px-1">${card.name}</div>
+            </div>
+        `;
+    }).join('');
+    updateElixirUI();
+}
+
+window.selectCard = function(index, cost, cardId) {
+    if (selectedCardIndex === index) { window.clearSelection(); return; }
+    selectedCardIndex = index; selectedCardCost = cost; windowCurrentSelectedCardId = cardId;
+    const cards = document.querySelectorAll('#card-deck .card');
+    cards.forEach((c, i) => { if(i === index) c.classList.add('selected'); else c.classList.remove('selected'); });
+};
+
+window.clearSelection = function() {
+    selectedCardIndex = -1; windowCurrentSelectedCardId = null;
+    document.querySelectorAll('#card-deck .card').forEach(c => c.classList.remove('selected'));
+};
+
+battlefield.addEventListener('click', async (e) => {
+    if (selectedCardIndex === -1 || isGameOver) return;
+    const rect = canvas.getBoundingClientRect(); 
+    // 터치 및 클릭 정확도 보정
+    const x = e.clientX - rect.left; 
+    const y = e.clientY - rect.top;
+
+    let validTower = null;
+    for (let t of towers) {
+        if (t.isPlayer && t.hp > 0 && Math.sqrt(Math.pow(x-t.x, 2) + Math.pow(y-t.y, 2)) <= 90) { validTower = t; break; }
+    }
+    if (!validTower) { showFloatingText("아군 타워 근처에 소환하세요!", "text-red-500", x, y); return; }
+
+    if (elixir >= selectedCardCost) {
+        elixir -= selectedCardCost; updateElixirUI();
+        
+        // 로컬에 즉시 스폰
+        entities.push(new Unit(x, y, true, windowCurrentSelectedCardId)); 
+        
+        // PVP 모드면 서버로 스폰 정보 전송
+        if (window.isMultiplayer && !window.isVsAI && currentUser && currentRoomCode) {
+            let xRatio = x / CANVAS_WIDTH;
+            let yRatio = y / CANVAS_HEIGHT;
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'spawns'), {
+                    roomId: currentRoomCode,
+                    cardId: windowCurrentSelectedCardId,
+                    xRatio: xRatio,
+                    yRatio: yRatio,
+                    isHost: window.isHost,
+                    timestamp: Date.now()
+                });
+            } catch(e) { console.error("Spawn send error", e); }
+        }
+    } else {
+        showFloatingText("엘릭서 부족!", "text-red-500", x, y);
+    }
+});
+
+// --- Entities ---
 class Particle {
     constructor(x, y, color, size, speedX, speedY, life) {
         this.x = x; this.y = y; this.color = color;
@@ -870,96 +1103,6 @@ class Particle {
 
 function spawnParticles(x, y, color, count, speedMod, life) {
     for(let i=0; i<count; i++) particles.push(new Particle(x, y, color, Math.random()*4+2, (Math.random()-0.5)*speedMod, (Math.random()-0.5)*speedMod, life + Math.random()*0.2));
-}
-
-function generateMathProblem() {
-    const types = ['rectangle', 'triangle', 'parallelogram', 'trapezoid', 'rhombus'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    let question = ""; let answer = 0; let wrongAnswers = [];
-
-    if (type === 'rectangle') {
-        const w = Math.floor(Math.random() * 8) + 3; const h = Math.floor(Math.random() * 8) + 3;
-        question = `가로 ${w}cm, 세로 ${h}cm 직사각형 넓이?`; answer = w * h;
-        wrongAnswers = [answer + w, answer - h + 1, answer + 2];
-    } else if (type === 'triangle') {
-        const b = Math.floor(Math.random() * 8) + 4; let h = Math.floor(Math.random() * 8) + 4;
-        if ((b * h) % 2 !== 0) h++;
-        question = `밑변 ${b}cm, 높이 ${h}cm 삼각형 넓이?`; answer = (b * h) / 2;
-        wrongAnswers = [b * h, answer + b, answer + 1];
-    } else if (type === 'parallelogram') {
-        const b = Math.floor(Math.random() * 8) + 3; const h = Math.floor(Math.random() * 8) + 3;
-        question = `밑변 ${b}cm, 높이 ${h}cm 평행사변형 넓이?`; answer = b * h;
-        wrongAnswers = [answer + b, (b * h) / 2, answer + 2];
-    } else if (type === 'trapezoid') {
-        const top = Math.floor(Math.random() * 6) + 3; const bottom = Math.floor(Math.random() * 6) + top + 2; let h = Math.floor(Math.random() * 6) + 4;
-        if (((top + bottom) * h) % 2 !== 0) h++;
-        question = `윗변 ${top}, 아랫변 ${bottom}, 높이 ${h} 사다리꼴 넓이?`; answer = ((top + bottom) * h) / 2;
-        wrongAnswers = [answer + h, answer * 2, answer - 2];
-    } else if (type === 'rhombus') {
-        const d1 = Math.floor(Math.random() * 8) + 4; let d2 = Math.floor(Math.random() * 8) + 4;
-        if ((d1 * d2) % 2 !== 0) d2++;
-        question = `대각선이 ${d1}cm, ${d2}cm 마름모 넓이?`; answer = (d1 * d2) / 2;
-        wrongAnswers = [d1 * d2, answer + d1, answer + 2];
-    }
-
-    wrongAnswers = wrongAnswers.map(ans => Math.max(1, Math.floor(ans)));
-    currentCorrectAnswer = answer.toString();
-    
-    const questionEl = document.getElementById('question-text');
-    if(question.length > 25) questionEl.classList.replace('text-3xl', 'text-2xl');
-    else questionEl.classList.replace('text-2xl', 'text-3xl');
-    questionEl.innerText = question;
-    
-    let options = [answer.toString(), wrongAnswers[0].toString(), wrongAnswers[1].toString(), wrongAnswers[2].toString()];
-    options = [...new Set(options)];
-    while(options.length < 4) {
-        let dummy = answer + Math.floor(Math.random() * 10) + 1;
-        if(!options.includes(dummy.toString())) options.push(dummy.toString());
-    }
-    options.sort(() => Math.random() - 0.5);
-
-    const btnContainer = document.getElementById('answer-buttons');
-    btnContainer.innerHTML = '';
-    options.forEach(opt => {
-        const btn = document.createElement('button');
-        btn.className = "bg-white border-[3px] border-blue-200 text-blue-800 font-bold py-5 px-4 rounded-xl text-xl hover:bg-blue-50 active:bg-blue-200 transition-colors shadow flex items-center justify-center";
-        btn.innerText = opt;
-        btn.onclick = () => checkAnswer(opt, btn);
-        btnContainer.appendChild(btn);
-    });
-}
-
-function checkAnswer(selected, btn) {
-    if (selected === currentCorrectAnswer) {
-        btn.classList.remove('border-blue-200', 'text-blue-800');
-        btn.classList.add('bg-green-500', 'text-white', 'border-green-600');
-        showFloatingText("정답! 💧+3", "text-green-400", CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
-        addElixir(3);
-        setTimeout(generateMathProblem, 500);
-    } else {
-        btn.classList.remove('border-blue-200', 'text-blue-800');
-        btn.classList.add('bg-red-500', 'text-white', 'border-red-600');
-        btn.disabled = true;
-        showFloatingText("오답! 💧-1", "text-red-500", CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
-        addElixir(-1);
-    }
-}
-
-function addElixir(amount) {
-    elixir += amount;
-    if(elixir > MAX_ELIXIR) elixir = MAX_ELIXIR;
-    if(elixir < 0) elixir = 0;
-    updateElixirUI();
-}
-
-function showFloatingText(text, colorClass, x, y) {
-    const el = document.createElement('div');
-    el.className = `floating-text ${colorClass} font-jua text-3xl z-50`;
-    el.innerText = text;
-    el.style.left = `${x}px`; el.style.top = `${y}px`;
-    el.style.transform = 'translate(-50%, -50%)';
-    battlefield.appendChild(el);
-    setTimeout(() => el.remove(), 1000);
 }
 
 class Tower {
@@ -1002,8 +1145,8 @@ class Tower {
         }
 
         const hpPerc = this.hp / this.maxHp;
-        ctx.fillStyle = '#000'; ctx.fillRect(this.x - 25, this.y - this.radius - 12, 50, 8);
-        ctx.fillStyle = this.isPlayer ? '#3b82f6' : '#ef4444'; ctx.fillRect(this.x - 25, this.y - this.radius - 12, 50 * hpPerc, 8);
+        ctx.fillStyle = '#000'; ctx.fillRect(this.x - 20, this.y - this.radius - 12, 40, 6);
+        ctx.fillStyle = this.isPlayer ? '#3b82f6' : '#ef4444'; ctx.fillRect(this.x - 20, this.y - this.radius - 12, 40 * hpPerc, 6);
     }
 }
 
@@ -1011,7 +1154,8 @@ class Unit {
     constructor(x, y, isPlayer, cardId) {
         this.x = x; this.y = y; this.isPlayer = isPlayer; this.cardId = cardId;
         const stats = cardDB[cardId];
-        this.type = stats.type; this.radius = stats.radius; this.maxHp = stats.maxHp;
+        this.type = stats.type; this.radius = stats.radius * 0.8; // 모바일 고려 약간 축소
+        this.maxHp = stats.maxHp;
         this.speed = stats.speed; this.range = stats.range; this.damage = stats.damage; this.cooldown = stats.cooldown;
         this.isTower = (this.type === 'tower');
         this.hp = this.maxHp; this.attackTimer = 0; this.target = null; this.jumpCooldown = 0;
@@ -1101,8 +1245,8 @@ class Unit {
         }
 
         const hpPerc = this.hp / this.maxHp;
-        ctx.fillStyle = '#000'; ctx.fillRect(this.x - 15, this.y - this.radius - 10, 30, 5);
-        ctx.fillStyle = this.isPlayer ? '#60a5fa' : '#f87171'; ctx.fillRect(this.x - 15, this.y - this.radius - 10, 30 * hpPerc, 5);
+        ctx.fillStyle = '#000'; ctx.fillRect(this.x - 12, this.y - this.radius - 8, 24, 4);
+        ctx.fillStyle = this.isPlayer ? '#60a5fa' : '#f87171'; ctx.fillRect(this.x - 12, this.y - this.radius - 8, 24 * hpPerc, 4);
     }
 }
 
@@ -1130,10 +1274,9 @@ class Bullet {
         if (this.trail.length > 1) {
             ctx.beginPath(); ctx.moveTo(this.trail[0].x, this.trail[0].y);
             for(let i=1; i<this.trail.length; i++) ctx.lineTo(this.trail[i].x, this.trail[i].y);
-            ctx.strokeStyle = this.color; ctx.lineWidth = 4; ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = this.color; ctx.lineWidth = 3; ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1.0;
         }
-        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(this.x, this.y, 5, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = this.color; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, Math.PI * 2); ctx.fill();
     }
 }
 
@@ -1173,101 +1316,89 @@ class BurningGround {
     }
     draw(ctx) {
         ctx.fillStyle = 'rgba(249, 115, 22, 0.3)'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(249, 115, 22, 0.6)'; ctx.stroke();
     }
 }
 
-function initGame(enemyDeckConfig) {
-    resizeCanvas();
-    entities = []; towers = []; particles = []; 
-    elixir = 5.0; timeRemaining = 120; isGameOver = false;
-    document.getElementById('game-over').style.display = 'none';
 
-    const enemyHpMult = (!window.isMultiplayer && currentMode > 0) ? 1 + (currentMode - 1) * 0.5 : 1;
-    currentEnemyDeck = enemyDeckConfig || Object.keys(cardDB);
+// --- Quiz Logic during Battle ---
+let currentCorrectAnswer = null;
 
-    towers.push(new Tower(CANVAS_WIDTH * 0.2, CANVAS_HEIGHT - 120, true, false, 1)); 
-    towers.push(new Tower(CANVAS_WIDTH * 0.8, CANVAS_HEIGHT - 120, true, false, 1)); 
-    towers.push(new Tower(CANVAS_WIDTH * 0.5, CANVAS_HEIGHT - 40, true, true, 1)); 
+function generateMathProblem() {
+    const types = ['rectangle', 'triangle', 'parallelogram'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    let question = ""; let answer = 0; let wrongAnswers = [];
 
-    towers.push(new Tower(CANVAS_WIDTH * 0.2, 120, false, false, enemyHpMult)); 
-    towers.push(new Tower(CANVAS_WIDTH * 0.8, 120, false, false, enemyHpMult)); 
-    towers.push(new Tower(CANVAS_WIDTH * 0.5, 40, false, true, enemyHpMult)); 
-
-    generateMathProblem();
-    lastTime = performance.now();
-    gameLoopId = requestAnimationFrame(gameLoop);
-    
-    if(window.enemySpawnInterval) clearInterval(window.enemySpawnInterval);
-    
-    // 싱글플레이 전용 (멀티플레이에서는 작동 안 함)
-    if (!window.isMultiplayer) {
-        const spawnRate = 3500 - (currentMode * 400); 
-        window.enemySpawnInterval = setInterval(enemyAI, spawnRate);
+    if (type === 'rectangle') {
+        const w = Math.floor(Math.random() * 8) + 3; const h = Math.floor(Math.random() * 8) + 3;
+        question = `가로 ${w}, 세로 ${h} 직사각형 넓이?`; answer = w * h;
+        wrongAnswers = [answer + w, answer - h + 1, answer + 2];
+    } else if (type === 'triangle') {
+        const b = Math.floor(Math.random() * 8) + 4; let h = Math.floor(Math.random() * 8) + 4;
+        if ((b * h) % 2 !== 0) h++;
+        question = `밑변 ${b}, 높이 ${h} 삼각형 넓이?`; answer = (b * h) / 2;
+        wrongAnswers = [b * h, answer + b, answer + 1];
+    } else if (type === 'parallelogram') {
+        const b = Math.floor(Math.random() * 8) + 3; const h = Math.floor(Math.random() * 8) + 3;
+        question = `밑변 ${b}, 높이 ${h} 평행사변형 넓이?`; answer = b * h;
+        wrongAnswers = [answer + b, (b * h) / 2, answer + 2];
     }
-}
 
-function enemyAI() {
-    if(isGameOver) return;
-    const randomCardId = currentEnemyDeck[Math.floor(Math.random() * currentEnemyDeck.length)];
-    const isLeft = Math.random() > 0.5;
-    const spawnX = isLeft ? CANVAS_WIDTH * 0.2 : CANVAS_WIDTH * 0.8;
-    const spawnY = 180; 
+    wrongAnswers = wrongAnswers.map(ans => Math.max(1, Math.floor(ans)));
+    currentCorrectAnswer = answer.toString();
     
-    if(Math.random() > 0.2) entities.push(new Unit(spawnX + (Math.random()*40-20), spawnY, false, randomCardId));
-}
-
-function selectCard(index, cost, cardId) {
-    if (selectedCardIndex === index) { clearSelection(); return; }
-    selectedCardIndex = index; selectedCardCost = cost; windowCurrentSelectedCardId = cardId;
-    const cards = document.querySelectorAll('#card-deck .card');
-    cards.forEach((c, i) => { if(i === index) c.classList.add('selected'); else c.classList.remove('selected'); });
-}
-
-function clearSelection() {
-    selectedCardIndex = -1; windowCurrentSelectedCardId = null;
-    document.querySelectorAll('#card-deck .card').forEach(c => c.classList.remove('selected'));
-}
-
-battlefield.addEventListener('click', (e) => {
-    if (selectedCardIndex === -1 || isGameOver) return;
-    const rect = canvas.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-
-    let validTower = null;
-    for (let t of towers) {
-        if (t.isPlayer && t.hp > 0 && Math.sqrt(Math.pow(x-t.x, 2) + Math.pow(y-t.y, 2)) <= 90) { validTower = t; break; }
+    const questionEl = document.getElementById('question-text');
+    questionEl.innerText = question;
+    
+    let options = [answer.toString(), wrongAnswers[0].toString(), wrongAnswers[1].toString(), wrongAnswers[2].toString()];
+    options = [...new Set(options)];
+    while(options.length < 4) {
+        let dummy = answer + Math.floor(Math.random() * 10) + 1;
+        if(!options.includes(dummy.toString())) options.push(dummy.toString());
     }
-    if (!validTower) { showFloatingText("아군 타워 근처에만 소환할 수 있습니다!", "text-red-500", x, y); return; }
+    options.sort(() => Math.random() - 0.5);
 
-    if (elixir >= selectedCardCost) {
-        elixir -= selectedCardCost; updateElixirUI();
-        
-        // ★ PVP 멀티플레이 실시간 스폰
-        if (window.isMultiplayer) {
-            let xRatio = x / CANVAS_WIDTH;
-            let yRatio = y / CANVAS_HEIGHT;
-            
-            // 게스트 기준으로는 좌표를 반전시켜서 DB에 올립니다.
-            if (!window.isHost) {
-                xRatio = 1 - xRatio;
-                yRatio = 1 - yRatio;
-            }
-            
-            window.firebasePush(window.firebaseRef(window.firebaseDB, `matches/${roomCode}/spawns`), {
-                cardId: windowCurrentSelectedCardId,
-                xRatio: xRatio,
-                yRatio: yRatio,
-                isHost: window.isHost,
-                timestamp: Date.now()
-            });
-        } else {
-            // 싱글플레이
-            entities.push(new Unit(x, y, true, windowCurrentSelectedCardId)); 
-        }
+    const btnContainer = document.getElementById('answer-buttons');
+    btnContainer.innerHTML = '';
+    options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = "bg-white border-[3px] border-blue-200 text-blue-800 font-bold py-2 md:py-4 px-2 rounded-xl text-sm md:text-xl hover:bg-blue-50 active:bg-blue-200 shadow flex items-center justify-center";
+        btn.innerText = opt;
+        btn.onclick = () => window.checkBattleAnswer(opt, btn);
+        btnContainer.appendChild(btn);
+    });
+}
+
+window.checkBattleAnswer = function(selected, btn) {
+    if (selected === currentCorrectAnswer) {
+        btn.classList.remove('border-blue-200', 'text-blue-800');
+        btn.classList.add('bg-green-500', 'text-white', 'border-green-600');
+        showFloatingText("정답! 💧+3", "text-green-400", CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
+        addElixir(3);
+        setTimeout(generateMathProblem, 500);
     } else {
-        showFloatingText("엘릭서 부족!", "text-red-500", x, y);
+        btn.classList.remove('border-blue-200', 'text-blue-800');
+        btn.classList.add('bg-red-500', 'text-white', 'border-red-600');
+        btn.disabled = true;
+        showFloatingText("오답! 💧-1", "text-red-500", CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
+        addElixir(-1);
     }
-});
+};
+
+function addElixir(amount) {
+    elixir += amount;
+    if(elixir > MAX_ELIXIR) elixir = MAX_ELIXIR;
+    if(elixir < 0) elixir = 0;
+    updateElixirUI();
+}
+
+function showFloatingText(text, colorClass, x, y) {
+    const el = document.createElement('div');
+    el.className = `floating-text ${colorClass} font-jua text-xl md:text-3xl z-50`;
+    el.innerText = text;
+    el.style.left = `${x}px`; el.style.top = `${y}px`;
+    battlefield.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+}
 
 function updateElixirUI() {
     document.getElementById('elixir-text').innerText = Math.floor(elixir);
@@ -1276,6 +1407,52 @@ function updateElixirUI() {
     cards.forEach((c, i) => {
         if (elixir < cardDB[myDeck[i]].cost) c.classList.add('disabled'); else c.classList.remove('disabled');
     });
+}
+
+
+// --- Game Core Loop ---
+function initGame(enemyDeckConfig) {
+    document.getElementById('battle-screen').style.display = 'flex';
+    resizeCanvas();
+    entities = []; towers = []; particles = []; 
+    elixir = 5.0; timeRemaining = 120; isGameOver = false;
+    document.getElementById('game-over').style.display = 'none';
+
+    const enemyHpMult = (gameMode === 'stage' && currentStage > 0) ? 1 + (currentStage - 1) * 0.5 : 1;
+    currentEnemyDeck = enemyDeckConfig || Object.keys(cardDB);
+
+    // Towers: [0,1,2] Player, [3,4,5] Enemy
+    towers.push(new Tower(CANVAS_WIDTH * 0.2, CANVAS_HEIGHT - 90, true, false, 1)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.8, CANVAS_HEIGHT - 90, true, false, 1)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.5, CANVAS_HEIGHT - 30, true, true, 1)); 
+
+    towers.push(new Tower(CANVAS_WIDTH * 0.2, 90, false, false, enemyHpMult)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.8, 90, false, false, enemyHpMult)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.5, 30, false, true, enemyHpMult)); 
+
+    generateMathProblem();
+    lastTime = performance.now();
+    
+    if(window.enemySpawnInterval) clearInterval(window.enemySpawnInterval);
+    
+    // 싱글플레이 또는 AI 모드일 때 봇 구동
+    if (gameMode === 'stage' || window.isVsAI) {
+        const diff = window.isVsAI ? 2 : currentStage; // AI모드는 스테이지 2수준
+        const spawnRate = 3500 - (diff * 400); 
+        window.enemySpawnInterval = setInterval(enemyAI, spawnRate);
+    }
+    
+    gameLoopId = requestAnimationFrame(gameLoop);
+}
+
+function enemyAI() {
+    if(isGameOver) return;
+    const randomCardId = currentEnemyDeck[Math.floor(Math.random() * currentEnemyDeck.length)];
+    const isLeft = Math.random() > 0.5;
+    const spawnX = isLeft ? CANVAS_WIDTH * 0.2 : CANVAS_WIDTH * 0.8;
+    const spawnY = 120; 
+    
+    if(Math.random() > 0.2) entities.push(new Unit(spawnX + (Math.random()*40-20), spawnY, false, randomCardId));
 }
 
 function checkWinCondition() {
@@ -1293,47 +1470,48 @@ function checkWinCondition() {
         
         overScreen.style.display = 'flex';
         if(!playerMainAlive) { 
-            title.innerText = "패배..."; title.className = "text-7xl font-jua mb-6 text-red-500"; 
+            title.innerText = "패배..."; title.className = "text-5xl md:text-7xl font-jua mb-6 text-red-500"; 
             desc.innerText = "수학 공부를 조금 더 해볼까요?"; 
-            btn.innerText = "다시 도전하기";
+            btn.innerText = gameMode === 'pvp' ? "로비로 나가기" : "다시 도전하기";
         } 
         else if(!enemyMainAlive) { 
-            title.innerText = "승리!"; title.className = "text-7xl font-jua mb-6 text-yellow-400"; 
-            if (currentMode === 3 && !window.isMultiplayer) {
+            title.innerText = "승리!"; title.className = "text-5xl md:text-7xl font-jua mb-6 text-yellow-400"; 
+            if (gameMode === 'stage' && currentStage === 3) {
                 desc.innerText = "최종 보스를 물리쳤습니다! 브레인 로얄 제패!";
                 btn.innerText = "처음으로 돌아가기";
-            } else if (window.isMultiplayer) {
+            } else if (gameMode === 'pvp') {
                 desc.innerText = "멀티플레이 대전에서 승리했습니다!";
                 btn.innerText = "로비로 돌아가기";
             } else {
                 desc.innerText = "훌륭합니다! 다음 스테이지가 열렸습니다.";
                 btn.innerText = "다음 스테이지로";
-                if (maxUnlockedStage === currentMode) maxUnlockedStage++;
+                if (maxUnlockedStage === currentStage) maxUnlockedStage++;
             }
         } 
         else { 
-            title.innerText = "무승부"; title.className = "text-7xl font-jua mb-6 text-gray-400"; 
+            title.innerText = "무승부"; title.className = "text-5xl md:text-7xl font-jua mb-6 text-gray-400"; 
             desc.innerText = "시간 초과!"; 
-            btn.innerText = "로비로 돌아가기";
+            btn.innerText = "나가기";
         }
 
         btn.onclick = () => {
             document.getElementById('game-over').style.display = 'none';
             document.getElementById('battle-screen').style.display = 'none';
             
-            if (window.isMultiplayer) {
-                cancelMatchmaking();
-            } else {
-                if (currentMode === 3 && !enemyMainAlive) {
-                    currentMode = 1; maxUnlockedStage = 1; 
-                    showScreen('title-screen');
-                } else {
-                    if(!enemyMainAlive && currentMode > 0 && currentMode < 3) currentMode++;
-                    renderDeckScreen(); showScreen('deck-screen'); 
-                }
-            }
             cancelAnimationFrame(gameLoopId);
             if(window.enemySpawnInterval) clearInterval(window.enemySpawnInterval);
+            
+            if (gameMode === 'pvp') {
+                window.cancelMatchmaking(); // PVP 종료 시 방 정리
+            } else {
+                if (currentStage === 3 && !enemyMainAlive) {
+                    currentStage = 1; maxUnlockedStage = 1; 
+                    window.showScreen('title-screen');
+                } else {
+                    if(!enemyMainAlive && currentStage > 0 && currentStage < 3) currentStage++;
+                    renderDeckScreen(); window.showScreen('deck-screen'); 
+                }
+            }
         };
     }
 }
@@ -1379,14 +1557,15 @@ function gameLoop(timestamp) {
                 ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(74, 222, 128, 0.9)'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
             }
         }
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; ctx.font = "24px Jua"; ctx.textAlign = "center";
-        ctx.fillText("빛나는 구역을 연속 터치하여 물량 소환! (취소: 카드 재터치)", CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.75);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; ctx.font = "20px Jua"; ctx.textAlign = "center";
+        ctx.fillText("빛나는 구역을 연속 터치하여 소환!", CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.75);
     }
 
     if(!isGameOver) gameLoopId = requestAnimationFrame(gameLoop);
 }
 
-window.onload = () => { window.multiplayerStarted = false; showScreen('title-screen'); setTimeout(resizeCanvas, 200); };
+// 초기 화면 진입
+window.onload = () => { window.showScreen('title-screen'); setTimeout(resizeCanvas, 200); };
 </script>
 </body>
 </html>
