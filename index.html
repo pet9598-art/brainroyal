@@ -330,9 +330,9 @@
     <div id="battle-screen">
         <div id="battle-section">
             <div class="bg-gray-900 text-white p-2 text-center shadow-md z-10 flex justify-between items-center px-4 text-sm md:text-base shrink-0">
-                <span id="enemy-name-display" class="font-bold text-red-400">적군 진영</span>
+                <span id="top-name-display" class="font-bold text-red-400">레드 진영 (상대)</span>
                 <span id="timer" class="text-yellow-400 font-jua text-xl md:text-2xl tracking-wider">02:00</span>
-                <span id="player-name-display" class="font-bold text-blue-400">아군 진영</span>
+                <span id="bottom-name-display" class="font-bold text-blue-400">블루 진영 (나)</span>
             </div>
             <div id="battlefield">
                 <div class="midline"></div>
@@ -766,6 +766,7 @@ window.createPvPRoom = async function() {
 
     myNickname = document.getElementById('nickname-input').value || "방장";
     currentRoomCode = generateRoomCode(); 
+    window.currentSessionId = Date.now().toString(); // 고유 세션 ID 발급
     
     window.showScreen('pvp-lobby-screen');
     document.getElementById('lobby-room-code').innerText = "생성 중...";
@@ -784,6 +785,7 @@ window.createPvPRoom = async function() {
             hostReady: false,
             guestReady: false,
             started: false,
+            sessionId: window.currentSessionId, // DB에 세션 ID 기록
             createdAt: Date.now()
         });
 
@@ -820,6 +822,8 @@ window.joinPvPRoom = async function() {
         if (!matchSnap.exists() || matchSnap.data().guestId) {
             throw new Error("방이 없거나 이미 가득 찼습니다.");
         }
+
+        window.currentSessionId = matchSnap.data().sessionId; // 세션 ID 동기화
 
         await updateDoc(matchRef, {
             guestId: currentUser.uid,
@@ -959,28 +963,27 @@ function startGameMultiplayer(hostName, guestName) {
     window.showScreen('battle-screen');
     renderBattleDeck();
     
-    document.getElementById('player-name-display').innerText = window.isHost ? hostName : guestName;
-    document.getElementById('enemy-name-display').innerText = window.isHost ? guestName : hostName;
+    // 절대 시점: 방장은 무조건 하단(블루), 도전자는 무조건 상단(레드)
+    document.getElementById('bottom-name-display').innerText = hostName;
+    document.getElementById('top-name-display').innerText = guestName;
     
     initGame(Object.keys(cardDB)); 
 
-    // PVP 스폰 리스너 (Firestore 단순 쿼리 후 클라이언트 필터링)
+    // PVP 스폰 리스너 (동일 세션 필터링 적용)
     if (!window.isVsAI) {
         const spawnsCol = collection(db, 'artifacts', appId, 'public', 'data', 'spawns');
         spawnUnsubscribe = onSnapshot(spawnsCol, (snapshot) => {
             snapshot.docChanges().forEach((change) => {
                 if (change.type === 'added') {
                     const data = change.doc.data();
-                    if (data.roomId === currentRoomCode && data.timestamp >= window.matchStartTime) {
-                        // 남이 보낸 스폰만 처리 (내가 보낸건 로컬에서 이미 생성)
-                        if (data.isHost !== window.isHost) {
+                    // 현재 매치의 고유 세션 ID가 일치하는 스폰만 처리 (기기 간 시간차 문제 완벽 해결)
+                    if (data.roomId === currentRoomCode && data.sessionId === window.currentSessionId) {
+                        // 상대방(다른 진영)이 보낸 스폰만 렌더링
+                        if (data.team !== window.myTeam) {
                             let spawnX = data.xRatio * CANVAS_WIDTH;
                             let spawnY = data.yRatio * CANVAS_HEIGHT;
-                            // 상대 화면 좌표 반전
-                            spawnX = (1 - data.xRatio) * CANVAS_WIDTH;
-                            spawnY = (1 - data.yRatio) * CANVAS_HEIGHT;
-                            
-                            entities.push(new Unit(spawnX, spawnY, false, data.cardId));
+                            // 좌표 반전 삭제: 이제 모두 동일한 절대 화면을 공유합니다.
+                            entities.push(new Unit(spawnX, spawnY, data.team, data.cardId));
                         }
                     }
                 }
@@ -1056,15 +1059,16 @@ battlefield.addEventListener('click', async (e) => {
 
     let validTower = null;
     for (let t of towers) {
-        if (t.isPlayer && t.hp > 0 && Math.sqrt(Math.pow(x-t.x, 2) + Math.pow(y-t.y, 2)) <= 90) { validTower = t; break; }
+        // 내 진영(myTeam)의 타워 주변에서만 소환 가능
+        if (t.team === window.myTeam && t.hp > 0 && Math.sqrt(Math.pow(x-t.x, 2) + Math.pow(y-t.y, 2)) <= 90) { validTower = t; break; }
     }
-    if (!validTower) { showFloatingText("아군 타워 근처에 소환하세요!", "text-red-500", x, y); return; }
+    if (!validTower) { window.showToast("아군 타워 근처에 소환하세요!"); return; }
 
     if (elixir >= selectedCardCost) {
         elixir -= selectedCardCost; updateElixirUI();
         
         // 로컬에 즉시 스폰
-        entities.push(new Unit(x, y, true, windowCurrentSelectedCardId)); 
+        entities.push(new Unit(x, y, window.myTeam, windowCurrentSelectedCardId)); 
         
         // PVP 모드면 서버로 스폰 정보 전송
         if (window.isMultiplayer && !window.isVsAI && currentUser && currentRoomCode) {
@@ -1073,10 +1077,11 @@ battlefield.addEventListener('click', async (e) => {
             try {
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'spawns'), {
                     roomId: currentRoomCode,
+                    sessionId: window.currentSessionId,
                     cardId: windowCurrentSelectedCardId,
                     xRatio: xRatio,
                     yRatio: yRatio,
-                    isHost: window.isHost,
+                    team: window.myTeam,
                     timestamp: Date.now()
                 });
             } catch(e) { console.error("Spawn send error", e); }
@@ -1087,6 +1092,10 @@ battlefield.addEventListener('click', async (e) => {
 });
 
 // --- Entities ---
+function spawnParticles(x, y, color, count, speedMod, life) {
+    for(let i=0; i<count; i++) particles.push(new Particle(x, y, color, Math.random()*4+2, (Math.random()-0.5)*speedMod, (Math.random()-0.5)*speedMod, life + Math.random()*0.2));
+}
+
 class Particle {
     constructor(x, y, color, size, speedX, speedY, life) {
         this.x = x; this.y = y; this.color = color;
@@ -1101,13 +1110,9 @@ class Particle {
     }
 }
 
-function spawnParticles(x, y, color, count, speedMod, life) {
-    for(let i=0; i<count; i++) particles.push(new Particle(x, y, color, Math.random()*4+2, (Math.random()-0.5)*speedMod, (Math.random()-0.5)*speedMod, life + Math.random()*0.2));
-}
-
 class Tower {
-    constructor(x, y, isPlayer, isMain, hpMult = 1) {
-        this.x = x; this.y = y; this.isPlayer = isPlayer; this.isMain = isMain; this.isTower = true;
+    constructor(x, y, team, isMain, hpMult = 1) {
+        this.x = x; this.y = y; this.team = team; this.isMain = isMain; this.isTower = true;
         this.maxHp = (isMain ? 3500 : 1500) * hpMult; this.hp = this.maxHp;
         this.radius = isMain ? 35 : 28;
         this.range = 150; this.attackDamage = 60; this.attackCooldown = 1.0; this.attackTimer = 0;
@@ -1120,39 +1125,39 @@ class Tower {
         else {
             this.target = null; let minDist = this.range;
             for(let ent of entities) {
-                if(ent.isPlayer !== this.isPlayer && ent.hp > 0 && !(ent instanceof Bullet) && !(ent instanceof Meteor) && !(ent instanceof BurningGround)) {
+                if(ent.team !== this.team && ent.hp > 0 && !(ent instanceof Bullet) && !(ent instanceof Meteor) && !(ent instanceof BurningGround)) {
                     let d = Math.hypot(ent.x - this.x, ent.y - this.y);
                     if(d < minDist) { minDist = d; this.target = ent; }
                 }
             }
         }
         if(this.target && this.attackTimer <= 0) {
-            entities.push(new Bullet(this.x, this.y, this.target, this.attackDamage, this.isPlayer, 'tower'));
+            entities.push(new Bullet(this.x, this.y, this.target, this.attackDamage, this.team, 'tower'));
             this.attackTimer = this.attackCooldown;
         }
     }
     draw(ctx) {
         if(this.hp <= 0) return;
         const imgKey = this.isMain ? 'mainTower' : 'subTower';
-        const imgMap = this.isPlayer ? loadedImagesPlayer : loadedImagesEnemy;
+        const imgMap = this.team === 'blue' ? loadedImagesPlayer : loadedImagesEnemy;
         
         if (imgMap[imgKey] && imgMap[imgKey].complete && imgMap[imgKey].naturalHeight !== 0) {
             const size = this.radius * 2.5;
             ctx.drawImage(imgMap[imgKey], this.x - size/2, this.y - size/2, size, size);
         } else {
-            ctx.fillStyle = this.isPlayer ? '#1d4ed8' : '#b91c1c';
+            ctx.fillStyle = this.team === 'blue' ? '#1d4ed8' : '#b91c1c';
             ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
         }
 
         const hpPerc = this.hp / this.maxHp;
         ctx.fillStyle = '#000'; ctx.fillRect(this.x - 20, this.y - this.radius - 12, 40, 6);
-        ctx.fillStyle = this.isPlayer ? '#3b82f6' : '#ef4444'; ctx.fillRect(this.x - 20, this.y - this.radius - 12, 40 * hpPerc, 6);
+        ctx.fillStyle = this.team === 'blue' ? '#3b82f6' : '#ef4444'; ctx.fillRect(this.x - 20, this.y - this.radius - 12, 40 * hpPerc, 6);
     }
 }
 
 class Unit {
-    constructor(x, y, isPlayer, cardId) {
-        this.x = x; this.y = y; this.isPlayer = isPlayer; this.cardId = cardId;
+    constructor(x, y, team, cardId) {
+        this.x = x; this.y = y; this.team = team; this.cardId = cardId;
         const stats = cardDB[cardId];
         this.type = stats.type; this.radius = stats.radius * 0.8; // 모바일 고려 약간 축소
         this.maxHp = stats.maxHp;
@@ -1169,7 +1174,7 @@ class Unit {
         let closest = null; let minDist = Infinity;
         if (this.type === 'healer') {
             for (let t of towers) {
-                if (t.isPlayer === this.isPlayer && t.hp > 0 && t.hp < t.maxHp) {
+                if (t.team === this.team && t.hp > 0 && t.hp < t.maxHp) {
                     let d = Math.hypot(t.x - this.x, t.y - this.y);
                     if (d < minDist) { minDist = d; closest = t; }
                 }
@@ -1177,13 +1182,13 @@ class Unit {
         } else {
             let tankClosest = null; let tankMinDist = Infinity;
             for(let t of towers) {
-                if(t.isPlayer !== this.isPlayer && t.hp > 0) {
+                if(t.team !== this.team && t.hp > 0) {
                     let d = Math.hypot(t.x - this.x, t.y - this.y);
                     if(d < minDist) { minDist = d; closest = t; }
                 }
             }
             for(let ent of entities) {
-                if(ent !== this && ent.hp > 0 && ent.isPlayer !== this.isPlayer && !(ent instanceof Bullet) && !(ent instanceof Meteor) && !(ent instanceof BurningGround)) {
+                if(ent !== this && ent.hp > 0 && ent.team !== this.team && !(ent instanceof Bullet) && !(ent instanceof Meteor) && !(ent instanceof BurningGround)) {
                     let d = Math.hypot(ent.x - this.x, ent.y - this.y);
                     if (this.type === 'mage' && ent.type === 'tank') {
                         if (d < tankMinDist) { tankMinDist = d; tankClosest = ent; }
@@ -1208,13 +1213,13 @@ class Unit {
                         this.target.hp = Math.min(this.target.maxHp, this.target.hp + this.damage);
                         this.hp -= this.damage * 0.5; spawnParticles(this.target.x, this.target.y, '#34d399', 10, 80, 0.4); 
                     } else if (this.type === 'archer' || this.type === 'tower') {
-                        entities.push(new Bullet(this.x, this.y, this.target, this.damage, this.isPlayer, this.type));
+                        entities.push(new Bullet(this.x, this.y, this.target, this.damage, this.team, this.type));
                     } else if (this.type === 'mage') {
-                        entities.push(new Meteor(this.target.x, this.target.y, this.damage, this.isPlayer));
+                        entities.push(new Meteor(this.target.x, this.target.y, this.damage, this.team));
                     } else if (this.type === 'giant_aoe') {
                         spawnParticles(this.x, this.y, '#9ca3af', 20, 200, 0.4); 
-                        for(let e of entities) { if (e.isPlayer !== this.isPlayer && e.hp > 0 && Math.hypot(e.x-this.x, e.y-this.y) <= 45) e.hp -= this.damage; }
-                        for(let t of towers) { if (t.isPlayer !== this.isPlayer && t.hp > 0 && Math.hypot(t.x-this.x, t.y-this.y) <= 45) t.hp -= this.damage; }
+                        for(let e of entities) { if (e.team !== this.team && e.hp > 0 && Math.hypot(e.x-this.x, e.y-this.y) <= 45) e.hp -= this.damage; }
+                        for(let t of towers) { if (t.team !== this.team && t.hp > 0 && Math.hypot(t.x-this.x, t.y-this.y) <= 45) t.hp -= this.damage; }
                     } else {
                         let actualDamage = this.damage;
                         if (this.type === 'tank' && this.target.isTower) actualDamage *= 2.0; 
@@ -1228,7 +1233,7 @@ class Unit {
                 this.x += (dx/dist) * this.speed * dt; this.y += (dy/dist) * this.speed * dt;
             }
         } else if (this.speed > 0 && this.type !== 'healer') {
-            this.y += this.isPlayer ? -this.speed * dt : this.speed * dt;
+            this.y += this.team === 'blue' ? -this.speed * dt : this.speed * dt;
         }
     }
     draw(ctx) {
@@ -1236,25 +1241,25 @@ class Unit {
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath(); ctx.ellipse(this.x, this.y + this.radius/2, this.radius*0.8, this.radius*0.4, 0, 0, Math.PI*2); ctx.fill();
 
-        const imgMap = this.isPlayer ? loadedImagesPlayer : loadedImagesEnemy;
+        const imgMap = this.team === 'blue' ? loadedImagesPlayer : loadedImagesEnemy;
         if (imgMap[this.cardId] && imgMap[this.cardId].complete && imgMap[this.cardId].naturalHeight !== 0) {
             const size = this.radius * 2.5; ctx.drawImage(imgMap[this.cardId], this.x - size/2, this.y - size/2, size, size);
         } else {
-            ctx.fillStyle = this.isPlayer ? 'rgba(59, 130, 246, 0.6)' : 'rgba(239, 68, 68, 0.6)';
+            ctx.fillStyle = this.team === 'blue' ? 'rgba(59, 130, 246, 0.6)' : 'rgba(239, 68, 68, 0.6)';
             ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
         }
 
         const hpPerc = this.hp / this.maxHp;
         ctx.fillStyle = '#000'; ctx.fillRect(this.x - 12, this.y - this.radius - 8, 24, 4);
-        ctx.fillStyle = this.isPlayer ? '#60a5fa' : '#f87171'; ctx.fillRect(this.x - 12, this.y - this.radius - 8, 24 * hpPerc, 4);
+        ctx.fillStyle = this.team === 'blue' ? '#60a5fa' : '#f87171'; ctx.fillRect(this.x - 12, this.y - this.radius - 8, 24 * hpPerc, 4);
     }
 }
 
 class Bullet {
-    constructor(x, y, target, damage, isPlayer, sourceType) {
+    constructor(x, y, target, damage, team, sourceType) {
         this.x = x; this.y = y; this.target = target;
-        this.damage = damage; this.isPlayer = isPlayer; this.sourceType = sourceType;
-        this.speed = 350; this.hp = 1; this.trail = []; this.color = isPlayer ? '#60a5fa' : '#f87171';
+        this.damage = damage; this.team = team; this.sourceType = sourceType;
+        this.speed = 350; this.hp = 1; this.trail = []; this.color = team === 'blue' ? '#60a5fa' : '#f87171';
     }
     update(dt) {
         this.trail.push({x: this.x, y: this.y}); if(this.trail.length > 5) this.trail.shift();
@@ -1281,16 +1286,16 @@ class Bullet {
 }
 
 class Meteor {
-    constructor(x, y, damage, isPlayer) {
-        this.x = x; this.y = y; this.damage = damage; this.isPlayer = isPlayer;
+    constructor(x, y, damage, team) {
+        this.x = x; this.y = y; this.damage = damage; this.team = team;
         this.timer = 0.5; this.hp = 1; this.radius = 45;
     }
     update(dt) {
         this.timer -= dt;
         if(this.timer <= 0) {
-            for(let e of entities) { if (e.isPlayer !== this.isPlayer && e.hp > 0 && Math.hypot(e.x-this.x, e.y-this.y) <= this.radius) e.hp -= this.damage; }
-            for(let t of towers) { if (t.isPlayer !== this.isPlayer && t.hp > 0 && Math.hypot(t.x-this.x, t.y-this.y) <= this.radius) t.hp -= this.damage; }
-            entities.push(new BurningGround(this.x, this.y, this.isPlayer));
+            for(let e of entities) { if (e.team !== this.team && e.hp > 0 && Math.hypot(e.x-this.x, e.y-this.y) <= this.radius) e.hp -= this.damage; }
+            for(let t of towers) { if (t.team !== this.team && t.hp > 0 && Math.hypot(t.x-this.x, t.y-this.y) <= this.radius) t.hp -= this.damage; }
+            entities.push(new BurningGround(this.x, this.y, this.team));
             spawnParticles(this.x, this.y, '#ef4444', 30, 300, 0.5); this.hp = 0;
         }
     }
@@ -1302,14 +1307,14 @@ class Meteor {
 }
 
 class BurningGround {
-    constructor(x, y, isPlayer) {
-        this.x = x; this.y = y; this.isPlayer = isPlayer;
+    constructor(x, y, team) {
+        this.x = x; this.y = y; this.team = team;
         this.timer = 3.0; this.tick = 0; this.hp = 1; this.radius = 45;
     }
     update(dt) {
         this.timer -= dt; this.tick -= dt;
         if(this.tick <= 0) {
-            for(let e of entities) { if (e.isPlayer !== this.isPlayer && e.hp > 0 && Math.hypot(e.x-this.x, e.y-this.y) <= this.radius) e.hp -= 20; }
+            for(let e of entities) { if (e.team !== this.team && e.hp > 0 && Math.hypot(e.x-this.x, e.y-this.y) <= this.radius) e.hp -= 20; }
             this.tick = 0.5; spawnParticles(this.x, this.y, '#f97316', 2, 50, 0.3); 
         }
         if(this.timer <= 0) this.hp = 0;
@@ -1421,14 +1426,18 @@ function initGame(enemyDeckConfig) {
     const enemyHpMult = (gameMode === 'stage' && currentStage > 0) ? 1 + (currentStage - 1) * 0.5 : 1;
     currentEnemyDeck = enemyDeckConfig || Object.keys(cardDB);
 
-    // Towers: [0,1,2] Player, [3,4,5] Enemy
-    towers.push(new Tower(CANVAS_WIDTH * 0.2, CANVAS_HEIGHT - 90, true, false, 1)); 
-    towers.push(new Tower(CANVAS_WIDTH * 0.8, CANVAS_HEIGHT - 90, true, false, 1)); 
-    towers.push(new Tower(CANVAS_WIDTH * 0.5, CANVAS_HEIGHT - 30, true, true, 1)); 
+    // 절대 진영 할당: 방장은 Blue(하단), 도전자는 Red(상단)
+    window.myTeam = (window.isMultiplayer && !window.isHost) ? 'red' : 'blue';
 
-    towers.push(new Tower(CANVAS_WIDTH * 0.2, 90, false, false, enemyHpMult)); 
-    towers.push(new Tower(CANVAS_WIDTH * 0.8, 90, false, false, enemyHpMult)); 
-    towers.push(new Tower(CANVAS_WIDTH * 0.5, 30, false, true, enemyHpMult)); 
+    // Blue Towers (Bottom - 하단)
+    towers.push(new Tower(CANVAS_WIDTH * 0.2, CANVAS_HEIGHT - 90, 'blue', false, window.myTeam === 'red' ? enemyHpMult : 1)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.8, CANVAS_HEIGHT - 90, 'blue', false, window.myTeam === 'red' ? enemyHpMult : 1)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.5, CANVAS_HEIGHT - 30, 'blue', true, window.myTeam === 'red' ? enemyHpMult : 1)); 
+
+    // Red Towers (Top - 상단)
+    towers.push(new Tower(CANVAS_WIDTH * 0.2, 90, 'red', false, window.myTeam === 'blue' ? enemyHpMult : 1)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.8, 90, 'red', false, window.myTeam === 'blue' ? enemyHpMult : 1)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.5, 30, 'red', true, window.myTeam === 'blue' ? enemyHpMult : 1)); 
 
     generateMathProblem();
     lastTime = performance.now();
@@ -1449,19 +1458,23 @@ function enemyAI() {
     if(isGameOver) return;
     const randomCardId = currentEnemyDeck[Math.floor(Math.random() * currentEnemyDeck.length)];
     const isLeft = Math.random() > 0.5;
+    // AI(적)는 무조건 Red(위쪽)에서 스폰됩니다.
     const spawnX = isLeft ? CANVAS_WIDTH * 0.2 : CANVAS_WIDTH * 0.8;
     const spawnY = 120; 
     
-    if(Math.random() > 0.2) entities.push(new Unit(spawnX + (Math.random()*40-20), spawnY, false, randomCardId));
+    if(Math.random() > 0.2) entities.push(new Unit(spawnX + (Math.random()*40-20), spawnY, 'red', randomCardId));
 }
 
 function checkWinCondition() {
-    let playerMainAlive = false; let enemyMainAlive = false;
+    let myMainAlive = false; let enemyMainAlive = false;
     for(let t of towers) {
-        if(t.isMain && t.hp > 0) { if(t.isPlayer) playerMainAlive = true; else enemyMainAlive = true; }
+        if(t.isMain && t.hp > 0) { 
+            if(t.team === window.myTeam) myMainAlive = true; 
+            else enemyMainAlive = true; 
+        }
     }
 
-    if(!playerMainAlive || !enemyMainAlive || timeRemaining <= 0) {
+    if(!myMainAlive || !enemyMainAlive || timeRemaining <= 0) {
         isGameOver = true;
         const overScreen = document.getElementById('game-over');
         const title = document.getElementById('game-over-title');
@@ -1469,7 +1482,7 @@ function checkWinCondition() {
         const btn = document.getElementById('restart-btn');
         
         overScreen.style.display = 'flex';
-        if(!playerMainAlive) { 
+        if(!myMainAlive) { 
             title.innerText = "패배..."; title.className = "text-5xl md:text-7xl font-jua mb-6 text-red-500"; 
             desc.innerText = "수학 공부를 조금 더 해볼까요?"; 
             btn.innerText = gameMode === 'pvp' ? "로비로 나가기" : "다시 도전하기";
@@ -1535,7 +1548,7 @@ function gameLoop(timestamp) {
     for (let i = entities.length - 1; i >= 0; i--) {
         let ent = entities[i]; ent.update(dt); ent.draw(ctx);
         if (ent.hp <= 0) {
-            let color = ent.isPlayer ? '#3b82f6' : '#ef4444';
+            let color = ent.team === 'blue' ? '#3b82f6' : '#ef4444';
             spawnParticles(ent.x, ent.y, color, 15, 200, 0.4);
             entities.splice(i, 1);
         }
@@ -1551,7 +1564,7 @@ function gameLoop(timestamp) {
     if (selectedCardIndex !== -1) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         for (let t of towers) {
-            if (t.isPlayer && t.hp > 0) {
+            if (t.team === window.myTeam && t.hp > 0) {
                 ctx.beginPath(); ctx.arc(t.x, t.y, 90, 0, Math.PI * 2);
                 ctx.fillStyle = 'rgba(74, 222, 128, 0.4)'; ctx.fill();
                 ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(74, 222, 128, 0.9)'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
