@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Brain Royale: 5th Grade Math</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- ★ 파이어베이스 SDK 로드 (PVP 멀티플레이용) ★ -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue, push, update, onDisconnect, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyBcHb9vGidW7BfR63HzX0jZZumt4A_kOg4",
+            authDomain: "brainroyal-22d66.firebaseapp.com",
+            databaseURL: "https://brainroyal-22d66-default-rtdb.firebaseio.com",
+            projectId: "brainroyal-22d66",
+            storageBucket: "brainroyal-22d66.firebasestorage.app",
+            messagingSenderId: "525375050441",
+            appId: "1:525375050441:web:8864fa7b89f808c60b7318"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        window.firebaseDB = database;
+        window.firebaseRef = ref;
+        window.firebaseSet = set;
+        window.firebaseOnValue = onValue;
+        window.firebasePush = push;
+        window.firebaseUpdate = update;
+        window.firebaseOnDisconnect = onDisconnect;
+        window.firebaseOnChildAdded = onChildAdded;
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #111827;
+            user-select: none;
+            touch-action: manipulation;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        .font-jua { font-family: 'Jua', sans-serif; }
+
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: row;
+            position: relative;
+        }
+
+        #title-screen {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url('https://i.imgur.com/LQAseaj.png');
+            background-size: cover;
+            background-position: center;
+            z-index: 50;
+        }
+
+        #unlock-screen, #deck-screen, #boss-intro-screen, #pvp-lobby-screen {
+            display: none;
+            flex-direction: column;
+            width: 100vw;
+            height: 100vh;
+            background-color: #0f172a;
+            color: white;
+            padding: 40px;
+            align-items: center;
+            z-index: 40;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+
+        #deck-screen { background-color: #1e293b; overflow-y: auto; }
+
+        #boss-intro-screen {
+            background: linear-gradient(135deg, #0f172a, #1e1b4b);
+            justify-content: center;
+            z-index: 45;
+        }
+
+        /* 신규: PVP 대기방 스타일 */
+        #pvp-lobby-screen {
+            background: linear-gradient(135deg, #1e1b4b, #312e81);
+            justify-content: center;
+            z-index: 48;
+        }
+
+        @keyframes bounce-scale {
+            0%, 100% { transform: scale(2); }
+            50% { transform: scale(2.2); }
+        }
+        #unlocked-card-display .deck-card { animation: bounce-scale 2s infinite; }
+
+        @keyframes float-boss {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+        .boss-image-container { animation: float-boss 3s ease-in-out infinite; }
+
+        #battle-screen { display: none; width: 100%; height: 100%; }
+
+        #battle-section {
+            flex-grow: 1;
+            position: relative;
+            background-color: #4ade80;
+            background-image: repeating-linear-gradient(
+                0deg, transparent, transparent 50px,
+                rgba(0, 0, 0, 0.05) 50px, rgba(0, 0, 0, 0.05) 100px
+            );
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.2);
+        }
+
+        #battlefield { flex-grow: 1; position: relative; width: 100%; height: 100%; }
+        canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+        #ui-section {
+            width: 400px; min-width: 350px;
+            background-color: #1f2937;
+            display: flex; flex-direction: column;
+            border-left: 4px solid #111827;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            z-index: 20;
+        }
+
+        #quiz-panel { flex-grow: 1; background: #ffffff; display: flex; flex-direction: column; padding: 1rem; }
+
+        .elixir-bar-container {
+            background: #374151; height: 24px; border-radius: 12px;
+            overflow: hidden; position: relative; border: 2px solid #111827;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .elixir-bar { height: 100%; background: linear-gradient(90deg, #ec4899, #fbcfe8); transition: width 0.2s ease-out; }
+
+        .card { transition: transform 0.1s, border-color 0.1s; cursor: pointer; }
+        .card:active { transform: scale(0.95); }
+        .card.disabled { filter: grayscale(100%) brightness(0.4); pointer-events: none; }
+        .card.selected { border-color: #fbbf24; box-shadow: 0 0 15px rgba(251, 191, 36, 0.6); transform: translateY(-5px); }
+
+        .midline {
+            position: absolute; top: 50%; left: 0; width: 100%; height: 4px;
+            background-color: rgba(255, 255, 255, 0.5); border-top: 2px dashed rgba(255, 255, 255, 0.8);
+            transform: translateY(-50%); z-index: 0;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
+        }
+        .floating-text {
+            position: absolute; font-weight: bold; color: white;
+            text-shadow: 2px 2px 4px black; pointer-events: none;
+            animation: floatUp 1s ease-out forwards; z-index: 100;
+        }
+
+        .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        .deck-card {
+            aspect-ratio: 3/4; border-radius: 10px; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; position: relative;
+            cursor: pointer; border: 3px solid transparent; transition: transform 0.1s, filter 0.1s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4); color: white; 
+        }
+        .deck-card svg { width: 35px; height: 35px; margin-bottom: 4px; margin-top: 8px; }
+        .deck-card:active { transform: scale(0.95); }
+        .deck-card.in-deck { border-color: #fbbf24; }
+        .deck-card.disabled { filter: grayscale(100%); opacity: 0.3; }
+
+        #game-over {
+            display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85); z-index: 1000; flex-direction: column;
+            justify-content: center; align-items: center; color: white;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="title-screen">
+        <div class="absolute w-full px-4 sm:px-10 md:px-16 lg:px-24 xl:px-32 top-[65%] flex justify-between items-center transform -translate-y-1/2">
+            <button onclick="showScreen('unlock-screen'); generateUnlockProblem();" class="w-40 sm:w-56 md:w-72 lg:w-80 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-jua text-lg sm:text-2xl md:text-3xl py-3 md:py-5 rounded-2xl shadow-2xl transition-all transform hover:scale-105 border-4 border-emerald-400 flex items-center justify-center gap-2 md:gap-3">
+                <span>🔓</span> 덱 해금하기
+            </button>
+            <button onclick="showScreen('deck-screen'); renderDeckScreen();" class="w-40 sm:w-56 md:w-72 lg:w-80 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-jua text-lg sm:text-2xl md:text-3xl py-3 md:py-5 rounded-2xl shadow-2xl transition-all transform hover:scale-105 border-4 border-blue-400 flex items-center justify-center gap-2 md:gap-3">
+                <span>⚔️</span> 전투 준비
+            </button>
+        </div>
+    </div>
+
+    <div id="unlock-screen">
+        <div class="w-full max-w-3xl flex justify-between items-center mb-8">
+            <button onclick="showScreen('title-screen')" class="text-white font-jua text-xl bg-gray-700 px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors shadow-md">◀ 메인 화면으로</button>
+            <h2 class="font-jua text-4xl text-emerald-400 drop-shadow-md">새로운 몬스터를 해금하세요!</h2>
+            <div class="w-32"></div>
+        </div>
+        <div class="bg-slate-800 p-10 rounded-3xl border-4 border-slate-600 shadow-2xl w-full max-w-3xl flex flex-col items-center">
+            <h3 class="font-bold text-xl text-emerald-200 mb-8 text-center bg-slate-900 px-6 py-2 rounded-full">쉬운 수학 문제를 풀고 새로운 카드를 얻어보세요.</h3>
+            <div id="unlock-question" class="text-center font-bold text-4xl text-white bg-slate-900 py-16 px-8 rounded-2xl border-2 border-emerald-500 w-full mb-10 shadow-inner">문제 로딩중...</div>
+            <div id="unlock-answers" class="grid grid-cols-2 gap-6 w-full"></div>
+        </div>
+        <div id="unlock-modal" class="hidden absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center">
+            <h2 class="font-jua text-6xl text-yellow-400 mb-12 animate-bounce">새로운 카드 획득!</h2>
+            <div id="unlocked-card-display" class="mb-20"></div>
+            <button onclick="closeUnlockModal()" class="bg-blue-500 hover:bg-blue-600 text-white font-jua text-3xl py-4 px-12 rounded-full shadow-lg border-2 border-blue-300 transition-transform hover:scale-105">계속하기</button>
+        </div>
+    </div>
+
+    <!-- 로비 및 PVP 덱 구성 화면 -->
+    <div id="deck-screen">
+        <div class="flex justify-between items-center w-full mb-4">
+            <button onclick="showScreen('title-screen')" class="text-white font-jua text-xl bg-gray-700 px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors shadow-md">◀ 메인 화면으로</button>
+            
+            <div class="flex items-center gap-4 bg-slate-800 px-6 py-2 rounded-full border-2 border-slate-600 shadow-lg">
+                <button onclick="changeMode(-1)" class="text-yellow-400 hover:text-yellow-300 text-3xl font-bold">◀</button>
+                <h2 id="mode-display" class="font-jua text-4xl text-center text-yellow-400 w-48">스테이지 1</h2>
+                <button onclick="changeMode(1)" class="text-yellow-400 hover:text-yellow-300 text-3xl font-bold">▶</button>
+            </div>
+            
+            <div class="w-32"></div>
+        </div>
+        
+        <div class="mb-4 bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
+            <h3 class="font-bold text-lg mb-2 flex justify-between">
+                <span class="text-white">선택된 전투 덱</span>
+                <span id="deck-count" class="text-yellow-400 font-jua text-xl">4/4</span>
+            </h3>
+            <div id="my-deck-grid" class="deck-grid min-h-[100px] !grid-cols-6"></div>
+        </div>
+        <div class="flex-grow bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-inner">
+            <h3 class="font-bold text-lg mb-2 text-gray-300">보유 몬스터 (1~6 코스트)</h3>
+            <div id="inventory-grid" class="deck-grid !grid-cols-8"></div>
+        </div>
+        
+        <div id="stage-controls" class="flex justify-center mt-4 mb-4">
+            <button onclick="startBossIntro()" class="w-full max-w-md bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-jua text-3xl py-4 rounded-2xl shadow-xl transition-all transform hover:scale-105 disabled:hover:scale-100">
+                보스전 진입!
+            </button>
+        </div>
+
+        <div id="pvp-controls" class="hidden flex-col items-center mt-4 mb-4 w-full max-w-lg mx-auto gap-4 bg-slate-800 p-6 rounded-2xl border-4 border-red-500 shadow-xl">
+            <h3 class="text-3xl font-jua text-red-400">🔥 대결하기 (PVP)</h3>
+            <input type="text" id="nickname-input" placeholder="나의 닉네임을 입력하세요" class="w-full px-4 py-3 rounded-xl text-black font-bold text-xl text-center outline-none focus:ring-4 ring-red-400">
+            
+            <button onclick="createPvPRoom()" class="w-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-jua text-2xl py-3 rounded-xl shadow-lg transition-all transform hover:scale-105">
+                새로운 방 개설하기
+            </button>
+            
+            <div class="w-full h-px bg-slate-600 my-1"></div>
+            
+            <div class="flex w-full gap-2">
+                <input type="text" id="room-id-input" placeholder="방 코드 (4자리)" class="w-1/2 px-4 py-3 rounded-xl text-black font-bold text-lg text-center outline-none focus:ring-4 ring-purple-400">
+                <button onclick="joinPvPRoom()" class="w-1/2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-jua text-2xl py-3 rounded-xl shadow-lg transition-all transform hover:scale-105">
+                    방 참여하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 보스 인트로 화면 -->
+    <div id="boss-intro-screen">
+        <h1 id="intro-stage-title" class="text-5xl font-jua text-yellow-400 mb-6 drop-shadow-lg">스테이지 1</h1>
+        <div class="bg-black/50 p-4 rounded-2xl border-2 border-red-500/50 mb-8 flex flex-col items-center shadow-xl">
+            <h3 class="text-red-400 font-bold mb-3">⚠️ 적군 덱 구성 미리보기</h3>
+            <div id="enemy-deck-preview" class="flex gap-3"></div>
+        </div>
+        <div class="boss-image-container mb-8">
+            <img id="boss-image" src="" alt="Boss" class="h-64 object-contain filter drop-shadow-[0_0_15px_rgba(239,68,68,0.8)]">
+        </div>
+        <div class="w-full max-w-2xl bg-slate-900/90 border-4 border-slate-600 p-6 rounded-2xl shadow-2xl relative cursor-pointer hover:bg-slate-800/90 transition-colors" onclick="nextDialogue()">
+            <div class="absolute -top-5 left-6 bg-red-600 text-white font-jua px-4 py-1 rounded-lg border-2 border-red-400 shadow-md">적 보스</div>
+            <p id="boss-dialogue" class="text-2xl font-jua text-white mt-2 leading-relaxed min-h-[80px] flex items-center"></p>
+            <div class="absolute bottom-3 right-4 text-yellow-400 animate-pulse text-sm">▶ 화면을 클릭하여 진행</div>
+        </div>
+    </div>
+
+    <!-- PVP 대기방 (블루 vs 레드) -->
+    <div id="pvp-lobby-screen">
+        <h1 class="text-6xl font-jua text-yellow-400 mb-4 drop-shadow-lg">PVP 대기방</h1>
+        <p class="text-2xl font-bold bg-slate-800 px-6 py-2 rounded-lg border border-slate-500 mb-10 shadow-md">방 코드: <span id="lobby-room-code" class="text-yellow-400 text-3xl ml-2"></span></p>
+        
+        <div class="flex w-full max-w-4xl justify-between gap-8">
+            <!-- 블루 진영 (호스트) -->
+            <div class="flex-1 bg-blue-900/40 border-4 border-blue-500 rounded-3xl p-8 flex flex-col items-center shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 w-full h-2 bg-blue-400"></div>
+                <h2 class="text-3xl font-jua text-blue-300 mb-6 drop-shadow-md">블루 진영 (호스트)</h2>
+                <div class="w-24 h-24 bg-blue-800 rounded-full flex items-center justify-center text-4xl mb-4 border-2 border-blue-400">🛡️</div>
+                <p id="host-name-display" class="text-2xl font-bold mb-8 text-white">대기중...</p>
+                <div id="host-ready-badge" class="bg-gray-600 text-white px-8 py-3 rounded-full font-bold text-xl transition-all shadow-inner">준비 중</div>
+            </div>
+            
+            <div class="flex items-center text-6xl font-jua text-yellow-500 drop-shadow-lg italic px-4">VS</div>
+
+            <!-- 레드 진영 (도전자) -->
+            <div class="flex-1 bg-red-900/40 border-4 border-red-500 rounded-3xl p-8 flex flex-col items-center shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 w-full h-2 bg-red-400"></div>
+                <h2 class="text-3xl font-jua text-red-300 mb-6 drop-shadow-md">레드 진영 (도전자)</h2>
+                <div class="w-24 h-24 bg-red-800 rounded-full flex items-center justify-center text-4xl mb-4 border-2 border-red-400">⚔️</div>
+                <p id="guest-name-display" class="text-2xl font-bold mb-8 text-white">대기중...</p>
+                <div id="guest-ready-badge" class="bg-gray-600 text-white px-8 py-3 rounded-full font-bold text-xl transition-all shadow-inner">준비 중</div>
+            </div>
+        </div>
+        
+        <button id="pvp-ready-btn" onclick="toggleReady()" class="mt-12 bg-yellow-500 hover:bg-yellow-400 text-black font-jua text-4xl py-5 px-20 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.5)] transition-transform hover:scale-105 border-4 border-yellow-600">준비 완료</button>
+        <button onclick="cancelMatchmaking()" class="mt-8 text-gray-400 hover:text-white font-jua text-xl underline decoration-gray-500 transition-colors">방 나가기</button>
+    </div>
+
+    <!-- 전투 화면 -->
+    <div id="battle-screen">
+        <div id="battle-section">
+            <div class="bg-gray-900 text-white p-2 text-center shadow-md z-10 flex justify-between items-center px-6">
+                <span id="enemy-name-display" class="font-bold text-red-400">적군 진영</span>
+                <span id="timer" class="text-yellow-400 font-jua text-2xl tracking-wider">02:00</span>
+                <span id="player-name-display" class="font-bold text-blue-400">아군 진영</span>
+            </div>
+            <div id="battlefield">
+                <div class="midline"></div>
+                <canvas id="gameCanvas"></canvas>
+            </div>
+        </div>
+        <div id="ui-section">
+            <div id="quiz-panel">
+                <div class="flex flex-col mb-4">
+                    <h3 class="font-jua text-2xl text-blue-800 mb-1 flex items-center gap-2">
+                        <span>⚡ 다각형 넓이 퀴즈</span>
+                    </h3>
+                    <div class="text-xs text-gray-500 bg-gray-100 p-2 rounded border border-gray-200">
+                        <span class="text-green-600 font-bold">정답: 엘릭서 +3</span> / <span class="text-red-500 font-bold">오답: 엘릭서 -1</span>
+                    </div>
+                </div>
+                <div id="question-text" class="text-center font-bold text-2xl text-gray-800 bg-blue-50 py-8 rounded-xl border-2 border-blue-200 shadow-inner mb-6 flex-grow flex items-center justify-center">문제 로딩중...</div>
+                <div id="answer-buttons" class="grid grid-cols-2 gap-3 mt-auto"></div>
+            </div>
+            <div class="bg-gray-900 p-4 shadow-inner border-t border-gray-700 flex flex-col justify-end">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="text-pink-400 font-jua text-2xl w-8 text-center" id="elixir-text">0</div>
+                    <div class="elixir-bar-container flex-grow h-5">
+                        <div class="elixir-bar" id="elixir-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="text-gray-400 text-xs font-bold w-12 text-right">MAX 10</div>
+                </div>
+                <div class="flex justify-between gap-2 h-28" id="card-deck"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="game-over">
+        <h1 id="game-over-title" class="text-7xl font-jua mb-6 text-yellow-400">승리!</h1>
+        <p id="game-over-desc" class="text-2xl mb-8 text-center px-4">지식의 힘으로 적을 물리쳤습니다!</p>
+        <button id="restart-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-full text-2xl shadow-lg transition-transform transform hover:scale-105 font-jua">
+            다음 스테이지로
+        </button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const battlefield = document.getElementById('battlefield');
+
+const icons = {
+    eq_triangle: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="50,10 90,90 10,90"/></svg>`, 
+    right_triangle: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="20,10 20,90 80,90"/></svg>`, 
+    iso_triangle: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="50,10 70,90 30,90"/></svg>`, 
+    square: `<svg viewBox="0 0 100 100" fill="currentColor"><rect x="20" y="20" width="60" height="60"/></svg>`, 
+    rectangle: `<svg viewBox="0 0 100 100" fill="currentColor"><rect x="15" y="30" width="70" height="40"/></svg>`, 
+    trapezoid: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="30,25 70,25 90,80 10,80"/></svg>`, 
+    parallelogram: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="30,25 90,25 70,75 10,75"/></svg>`, 
+    rhombus: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="50,10 85,50 50,90 15,50"/></svg>`, 
+    circle: `<svg viewBox="0 0 100 100" fill="currentColor"><circle cx="50" cy="50" r="40"/></svg>`, 
+    pentagon: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="50,10 90,40 75,90 25,90 10,40"/></svg>`, 
+    hexagon: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="50,10 85,30 85,70 50,90 15,70 15,30"/></svg>`, 
+    dodecagon: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="50,5 72,11 89,27 95,50 89,72 72,89 50,95 27,89 11,72 5,50 11,27 27,11"/></svg>`, 
+    star: `<svg viewBox="0 0 100 100" fill="currentColor"><polygon points="50,5 61,35 92,35 67,54 76,85 50,66 24,85 33,54 8,35 39,35"/></svg>`, 
+    mainTower: `<svg viewBox="0 0 100 100" fill="currentColor"><path d="M10 80 L90 80 L90 40 L70 60 L50 20 L30 60 L10 40 Z"/></svg>`,
+    subTower: `<svg viewBox="0 0 100 100" fill="currentColor"><path d="M20 90 L20 40 L30 40 L30 20 L40 20 L40 40 L60 40 L60 20 L70 20 L70 40 L80 40 L80 90 Z"/></svg>`
+};
+
+const cardDB = {
+    'archer_1': { id: 'archer_1', name: '정삼각형', cost: 1, type: 'archer', svg: icons.eq_triangle, bg: 'from-green-400 to-green-600', border: 'border-green-300', maxHp: 100, speed: 50, range: 120, damage: 30, cooldown: 0.8, radius: 12, role: '기본 궁수', desc: '[궁수형] 공속과 데미지가 뛰어납니다. (속도형 적에게는 화살 데미지 반감)' },
+    'archer_2': { id: 'archer_2', name: '직각삼각형', cost: 2, type: 'archer', svg: icons.right_triangle, bg: 'from-green-500 to-green-700', border: 'border-green-400', maxHp: 180, speed: 50, range: 130, damage: 50, cooldown: 0.7, radius: 14, role: '중급 궁수', desc: '[궁수형] 직각의 예리함으로 적을 꿰뚫습니다. (속도형 적에게 데미지 반감)' },
+    'archer_3': { id: 'archer_3', name: '이등변삼각형', cost: 3, type: 'archer', svg: icons.iso_triangle, bg: 'from-emerald-600 to-emerald-800', border: 'border-emerald-400', maxHp: 250, speed: 50, range: 140, damage: 80, cooldown: 0.6, radius: 15, role: '고급 궁수', desc: '[궁수형] 긴 사거리와 파괴력을 가졌습니다. (속도형 적에게 데미지 반감)' },
+    'tank_1': { id: 'tank_1', name: '정사각형', cost: 1, type: 'tank', svg: icons.square, bg: 'from-blue-400 to-blue-600', border: 'border-blue-300', maxHp: 300, speed: 30, range: 25, damage: 25, cooldown: 1.5, radius: 15, role: '기본 방패', desc: '[방패형] 튼튼한 체력으로 앞장섭니다. (타워 공격 시 2배의 피해를 입힙니다)' },
+    'tank_2': { id: 'tank_2', name: '직사각형', cost: 2, type: 'tank', svg: icons.rectangle, bg: 'from-blue-500 to-blue-700', border: 'border-blue-400', maxHp: 600, speed: 30, range: 25, damage: 45, cooldown: 1.3, radius: 18, role: '중급 방패', desc: '[방패형] 더 넓은 체력을 보유한 기사입니다. (타워 공격 시 데미지 2배)' },
+    'tank_3': { id: 'tank_3', name: '사다리꼴', cost: 3, type: 'tank', svg: icons.trapezoid, bg: 'from-indigo-600 to-indigo-800', border: 'border-indigo-400', maxHp: 1000, speed: 30, range: 25, damage: 70, cooldown: 1.1, radius: 20, role: '고급 방패', desc: '[방패형] 막강한 체력과 근접 공격력을 가졌습니다. (타워 공격 시 데미지 2배)' },
+    'speed_1': { id: 'speed_1', name: '평행사변형', cost: 1, type: 'speed', svg: icons.parallelogram, bg: 'from-yellow-400 to-yellow-600', border: 'border-yellow-300', maxHp: 150, speed: 70, range: 25, damage: 35, cooldown: 1.0, radius: 14, role: '기본 속도', desc: '[속도형] 빠르게 접근합니다. (궁수에게 강함 - 화살 피해를 50%만 받습니다)' },
+    'speed_2': { id: 'speed_2', name: '마름모', cost: 4, type: 'assassin', svg: icons.rhombus, bg: 'from-orange-500 to-orange-700', border: 'border-orange-400', maxHp: 400, speed: 80, range: 150, damage: 100, cooldown: 1.2, radius: 18, role: '기습 암살', desc: '[속도형] 마법사나 궁수를 발견하면 주변으로 순간이동(점프)하여 암살합니다!' },
+    'mage_1': { id: 'mage_1', name: '원', cost: 5, type: 'mage', svg: icons.circle, bg: 'from-purple-500 to-purple-700', border: 'border-purple-300', maxHp: 350, speed: 25, range: 150, damage: 150, cooldown: 3.0, radius: 20, role: '광역 메테오', desc: '[마법사형] 탱커를 최우선 공격! 범위에 메테오를 떨구고 3초간 불타는 대지를 만듭니다.' },
+    'tower_1': { id: 'tower_1', name: '오각형', cost: 2, type: 'tower', svg: icons.pentagon, bg: 'from-gray-500 to-gray-700', border: 'border-gray-400', maxHp: 800, speed: 0, range: 130, damage: 50, cooldown: 0.8, radius: 22, role: '설치형 타워', desc: '[타워형] 첫 타겟을 끝까지 추적하여 방어합니다. (방패병의 공격에 매우 약함)' },
+    'giant_1': { id: 'giant_1', name: '육각형', cost: 4, type: 'giant', svg: icons.hexagon, bg: 'from-stone-600 to-stone-800', border: 'border-stone-400', maxHp: 1800, speed: 15, range: 30, damage: 100, cooldown: 2.5, radius: 24, role: '거인', desc: '[거인형] 막대한 체력을 지녔지만 이동속도가 매우 느립니다.' },
+    'giant_2': { id: 'giant_2', name: '십이각형', cost: 6, type: 'giant_aoe', svg: icons.dodecagon, bg: 'from-red-800 to-black', border: 'border-red-600', maxHp: 2800, speed: 12, range: 40, damage: 150, cooldown: 3.0, radius: 30, role: '대형(광역)', desc: '[거인형] 공격 시 육중한 발구르기로 주변의 모든 적과 타워에 광역 피해를 줍니다.' },
+    'healer_1': { id: 'healer_1', name: '별표', cost: 2, type: 'healer', svg: icons.star, bg: 'from-pink-400 to-pink-600', border: 'border-pink-300', maxHp: 400, speed: 45, range: 50, damage: 40, cooldown: 1.0, radius: 18, role: '타워 회복', desc: '[힐러형] 자신의 체력을 깎으며 상처 입은 아군 타워를 지속적으로 수리합니다.' }
+};
+
+const sortedCardKeys = Object.keys(cardDB).sort((a, b) => cardDB[a].cost - cardDB[b].cost);
+
+const stageData = [
+    { id: 1, deckSize: 4, bossImg: "https://i.imgur.com/I2SHeWv.png", dialogues: ["끼에에엑 (반가워!)", "끼에에에엑 (나랑 좋은 승부하자!)"], enemyDeck: ['archer_1', 'tank_1', 'speed_1', 'tower_1'] },
+    { id: 2, deckSize: 5, bossImg: "https://i.imgur.com/NtyMyxM.png", dialogues: ["난 나보다 약한 인간 상대로는 최선을 다하지 않아.."], enemyDeck: ['archer_2', 'tank_2', 'speed_2', 'healer_1', 'tower_1'] },
+    { id: 3, deckSize: 6, bossImg: "https://i.imgur.com/N4pxjYu.png", dialogues: ["감히... 내 부하들을 해치우다니", "마지막 승부다, 최고의 덱을 구성해왔겠지?"], enemyDeck: ['archer_3', 'tank_3', 'mage_1', 'giant_1', 'giant_2', 'tower_1'] }
+];
+
+let currentMode = 1; 
+let maxUnlockedStage = 3; 
+let maxDeckSize = stageData[0].deckSize;
+
+let unlockedCards = ['archer_1', 'tank_1', 'speed_1', 'tower_1']; 
+let myDeck = ['archer_1', 'tank_1', 'speed_1', 'tower_1']; 
+
+const loadedImages = {};
+const loadedImagesPlayer = {};
+const loadedImagesEnemy = {};
+
+function preloadSVGs() {
+    for(let key in cardDB) {
+        let baseSvg = cardDB[key].svg;
+        if (!baseSvg.includes('xmlns')) baseSvg = baseSvg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" ');
+        let styledSvg = baseSvg.replace('<svg ', '<svg stroke="black" stroke-width="3" stroke-linejoin="round" ');
+
+        let pSvg = styledSvg.replace(/currentColor/g, '#60a5fa');
+        let pImg = new Image(); pImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pSvg);
+        loadedImagesPlayer[key] = pImg;
+
+        let eSvg = styledSvg.replace(/currentColor/g, '#f87171');
+        let eImg = new Image(); eImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(eSvg);
+        loadedImagesEnemy[key] = eImg;
+
+        let uiSvg = baseSvg.replace(/currentColor/g, '#ffffff');
+        let uiImg = new Image(); uiImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(uiSvg);
+        loadedImages[key] = uiImg;
+    }
+
+    ['mainTower', 'subTower'].forEach(t => {
+        let baseSvg = icons[t];
+        if (!baseSvg.includes('xmlns')) baseSvg = baseSvg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" ');
+        let styledSvg = baseSvg.replace('<svg ', '<svg stroke="black" stroke-width="3" stroke-linejoin="round" ');
+
+        let pSvg = styledSvg.replace(/currentColor/g, '#3b82f6');
+        let pImg = new Image(); pImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pSvg);
+        loadedImagesPlayer[t] = pImg;
+
+        let eSvg = styledSvg.replace(/currentColor/g, '#ef4444');
+        let eImg = new Image(); eImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(eSvg);
+        loadedImagesEnemy[t] = eImg;
+    });
+}
+preloadSVGs();
+
+function showScreen(screenId) {
+    const screens = ['title-screen', 'unlock-screen', 'deck-screen', 'boss-intro-screen', 'pvp-lobby-screen', 'battle-screen'];
+    screens.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = (id === screenId) ? 'flex' : 'none';
+    });
+}
+
+function changeMode(dir) {
+    let newMode = currentMode + dir;
+    if (newMode >= 0 && newMode <= maxUnlockedStage) {
+        currentMode = newMode;
+        let displayEl = document.getElementById('mode-display');
+        
+        if (currentMode === 0) {
+            displayEl.innerText = "PVP 결투";
+            displayEl.className = "font-jua text-4xl text-center text-red-400 w-48";
+            document.getElementById('stage-controls').classList.add('hidden');
+            document.getElementById('pvp-controls').classList.remove('hidden');
+            document.getElementById('pvp-controls').classList.add('flex');
+            maxDeckSize = 6;
+        } else {
+            displayEl.innerText = `스테이지 ${currentMode}`;
+            displayEl.className = "font-jua text-4xl text-center text-yellow-400 w-48";
+            document.getElementById('pvp-controls').classList.add('hidden');
+            document.getElementById('pvp-controls').classList.remove('flex');
+            document.getElementById('stage-controls').classList.remove('hidden');
+            maxDeckSize = stageData[currentMode-1].deckSize;
+        }
+        
+        if (myDeck.length > maxDeckSize) myDeck = myDeck.slice(0, maxDeckSize);
+        renderDeckScreen();
+    }
+}
+
+function createCardHTML(card, onClickFn, isSelected = false) {
+    const selectedClass = isSelected ? 'in-deck' : '';
+    return `
+        <div class="deck-card text-white bg-gradient-to-b ${card.bg} border-[3px] ${card.border} ${selectedClass}" 
+             onclick="${onClickFn}('${card.id}')" title="${card.desc}">
+            <div class="absolute top-0 left-0 bg-pink-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded-br-lg z-10">${card.cost} 💧</div>
+            ${card.svg}
+            <div class="text-white text-[9px] md:text-[10px] font-bold text-center leading-tight w-full truncate px-1">${card.name}</div>
+        </div>
+    `;
+}
+
+function renderDeckScreen() {
+    document.getElementById('deck-count').innerText = `${myDeck.length}/${maxDeckSize}`;
+    const myDeckContainer = document.getElementById('my-deck-grid');
+    const inventoryContainer = document.getElementById('inventory-grid');
+    
+    myDeckContainer.innerHTML = myDeck.map(id => createCardHTML(cardDB[id], 'removeFromDeck')).join('');
+    for(let i = myDeck.length; i < maxDeckSize; i++) {
+        myDeckContainer.innerHTML += `<div class="deck-card bg-slate-700 border-2 border-slate-600 border-dashed flex items-center justify-center text-slate-500"><span class="text-3xl">+</span></div>`;
+    }
+
+    let invHTML = '';
+    for (const id of sortedCardKeys) {
+        const card = cardDB[id];
+        const isSelected = myDeck.includes(id);
+        const isUnlocked = unlockedCards.includes(id);
+
+        if (isUnlocked) {
+            const disabledClass = isSelected ? 'disabled' : '';
+            invHTML += `
+                <div class="deck-card text-white bg-gradient-to-b ${card.bg} border-[3px] ${card.border} ${disabledClass}" 
+                     onclick="addToDeck('${id}')" title="${card.desc}">
+                    <div class="absolute top-0 left-0 bg-pink-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded-br-lg z-10">${card.cost} 💧</div>
+                    ${card.svg}
+                    <div class="text-white text-[9px] md:text-[10px] font-bold text-center leading-tight px-1">${card.name}</div>
+                    ${isSelected ? '<div class="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center font-bold text-yellow-400 text-sm border-2 border-yellow-400">장착됨</div>' : ''}
+                </div>
+            `;
+        } else {
+            invHTML += `
+                <div class="deck-card text-white bg-slate-800 border-[3px] border-slate-700 opacity-60 cursor-not-allowed">
+                    <div class="text-2xl mb-2 text-gray-500">🔒</div>
+                    <div class="text-gray-400 text-[9px] md:text-[10px] font-bold text-center px-1">잠김</div>
+                </div>
+            `;
+        }
+    }
+    inventoryContainer.innerHTML = invHTML;
+    const startBtn = document.getElementById('start-battle-btn');
+    if(startBtn) startBtn.disabled = myDeck.length !== maxDeckSize;
+}
+
+function addToDeck(cardId) {
+    if (myDeck.includes(cardId) || myDeck.length >= maxDeckSize || !unlockedCards.includes(cardId)) return;
+    myDeck.push(cardId); renderDeckScreen();
+}
+
+function removeFromDeck(cardId) {
+    myDeck = myDeck.filter(id => id !== cardId); renderDeckScreen();
+}
+
+
+// --- 스테이지 보스전 ---
+let dialogueIndex = 0;
+
+function startBossIntro() {
+    if (myDeck.length !== maxDeckSize) return;
+    window.isMultiplayer = false;
+    document.getElementById('player-name-display').innerText = "아군 진영";
+    document.getElementById('enemy-name-display').innerText = "적 보스";
+    
+    showScreen('boss-intro-screen');
+    const stageInfo = stageData[currentMode-1];
+    
+    document.getElementById('intro-stage-title').innerText = `스테이지 ${currentMode}`;
+    document.getElementById('boss-image').src = stageInfo.bossImg;
+    
+    const enemyDeckContainer = document.getElementById('enemy-deck-preview');
+    enemyDeckContainer.innerHTML = stageInfo.enemyDeck.map(id => {
+        const card = cardDB[id];
+        return `
+            <div class="w-12 h-16 md:w-16 md:h-20 bg-gradient-to-b ${card.bg} rounded-lg border-2 ${card.border} flex flex-col items-center justify-center shadow-md">
+                <div class="w-6 h-6 md:w-8 md:h-8 text-white">${card.svg}</div>
+            </div>
+        `;
+    }).join('');
+
+    dialogueIndex = 0; showDialogue();
+}
+
+function showDialogue() {
+    const dialogues = stageData[currentMode-1].dialogues;
+    if (dialogueIndex < dialogues.length) {
+        document.getElementById('boss-dialogue').innerText = dialogues[dialogueIndex];
+    } else {
+        showScreen('battle-screen'); renderBattleDeck();
+        initGame(stageData[currentMode-1].enemyDeck); 
+    }
+}
+
+function nextDialogue() { dialogueIndex++; showDialogue(); }
+
+
+// --- ★ PVP 멀티플레이 로직 (Firebase) ★ ---
+let myNickname = "";
+let roomCode = "";
+window.isReady = false;
+
+function createPvPRoom() {
+    if(myDeck.length !== maxDeckSize) return alert(`덱을 ${maxDeckSize}장 꽉 채워주세요!`);
+    if(!window.firebaseDB) return alert("HTML 상단에 파이어베이스 설정값을 올바르게 입력해주세요.");
+
+    myNickname = document.getElementById('nickname-input').value || "방장";
+    roomCode = Math.floor(1000 + Math.random() * 9000).toString(); 
+    
+    const matchRef = window.firebaseRef(window.firebaseDB, `matches/${roomCode}`);
+    window.firebaseSet(matchRef, {
+        waiting: true,
+        hostName: myNickname,
+        hostReady: false,
+        guestReady: false,
+        started: false
+    }).then(() => {
+        window.isHost = true;
+        window.isMultiplayer = true;
+        window.multiplayerStarted = false;
+        window.isReady = false;
+        
+        setupPvPLobbyUI();
+        window.firebaseOnDisconnect(matchRef).remove(); 
+        setupMatchListener(matchRef);
+    }).catch(e => alert("방 생성 실패: " + e));
+}
+
+function joinPvPRoom() {
+    if(myDeck.length !== maxDeckSize) return alert(`덱을 ${maxDeckSize}장 꽉 채워주세요!`);
+    if(!window.firebaseDB) return alert("파이어베이스 설정값을 확인해주세요.");
+    
+    roomCode = document.getElementById('room-id-input').value;
+    if(!roomCode) return alert("방 코드를 입력해주세요!");
+    
+    myNickname = document.getElementById('nickname-input').value || "도전자";
+    
+    const matchRef = window.firebaseRef(window.firebaseDB, `matches/${roomCode}`);
+    
+    window.firebaseUpdate(matchRef, {
+        waiting: false,
+        guestName: myNickname
+    }).then(() => {
+        window.isHost = false;
+        window.isMultiplayer = true;
+        window.multiplayerStarted = false;
+        window.isReady = false;
+        
+        setupPvPLobbyUI();
+        setupMatchListener(matchRef);
+    }).catch(e => alert("방을 찾을 수 없거나 이미 꽉 찼습니다."));
+}
+
+function setupPvPLobbyUI() {
+    showScreen('pvp-lobby-screen');
+    document.getElementById('lobby-room-code').innerText = roomCode;
+    
+    const btn = document.getElementById('pvp-ready-btn');
+    btn.innerText = "준비 완료";
+    btn.className = "mt-12 bg-yellow-500 hover:bg-yellow-400 text-black font-jua text-4xl py-5 px-20 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.5)] transition-transform hover:scale-105 border-4 border-yellow-600";
+}
+
+function toggleReady() {
+    if (!window.firebaseDB || !roomCode) return;
+    window.isReady = !window.isReady;
+    
+    const btn = document.getElementById('pvp-ready-btn');
+    if (window.isReady) {
+        btn.innerText = "준비 취소";
+        btn.className = "mt-12 bg-green-500 hover:bg-green-400 text-white font-jua text-4xl py-5 px-20 rounded-full shadow-[0_0_20px_rgba(34,197,94,0.5)] transition-transform hover:scale-105 border-4 border-green-600";
+    } else {
+        btn.innerText = "준비 완료";
+        btn.className = "mt-12 bg-yellow-500 hover:bg-yellow-400 text-black font-jua text-4xl py-5 px-20 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.5)] transition-transform hover:scale-105 border-4 border-yellow-600";
+    }
+
+    const matchRef = window.firebaseRef(window.firebaseDB, `matches/${roomCode}`);
+    window.firebaseUpdate(matchRef, window.isHost ? { hostReady: window.isReady } : { guestReady: window.isReady });
+}
+
+function setupMatchListener(matchRef) {
+    window.firebaseOnValue(matchRef, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) {
+            if (!window.isHost && !window.multiplayerStarted) {
+                alert("호스트가 방을 나갔습니다.");
+                cancelMatchmaking();
+            }
+            return;
+        }
+        
+        document.getElementById('host-name-display').innerText = data.hostName || "대기중...";
+        document.getElementById('guest-name-display').innerText = data.guestName || "대기중...";
+
+        const hostBadge = document.getElementById('host-ready-badge');
+        hostBadge.innerText = data.hostReady ? "READY!" : "준비 중";
+        hostBadge.className = data.hostReady ? "bg-blue-500 text-white px-8 py-3 rounded-full font-bold text-xl shadow-lg border-2 border-white" : "bg-gray-600 text-white px-8 py-3 rounded-full font-bold text-xl shadow-inner";
+
+        const guestBadge = document.getElementById('guest-ready-badge');
+        guestBadge.innerText = data.guestReady ? "READY!" : "준비 중";
+        guestBadge.className = data.guestReady ? "bg-red-500 text-white px-8 py-3 rounded-full font-bold text-xl shadow-lg border-2 border-white" : "bg-gray-600 text-white px-8 py-3 rounded-full font-bold text-xl shadow-inner";
+
+        if (window.isHost && data.hostReady && data.guestReady && !data.started) {
+            window.firebaseUpdate(matchRef, { started: true });
+        }
+
+        if (data.started && !window.multiplayerStarted) {
+            startGameMultiplayer(data.hostName, data.guestName); 
+        }
+    });
+}
+
+function cancelMatchmaking() {
+    if(roomCode && window.isHost && window.firebaseDB) {
+        window.firebaseSet(window.firebaseRef(window.firebaseDB, `matches/${roomCode}`), null);
+    }
+    roomCode = "";
+    window.isMultiplayer = false;
+    showScreen('deck-screen');
+}
+
+function startGameMultiplayer(hostName, guestName) {
+    window.multiplayerStarted = true;
+    showScreen('battle-screen');
+    renderBattleDeck();
+    
+    document.getElementById('player-name-display').innerText = window.isHost ? hostName : guestName;
+    document.getElementById('enemy-name-display').innerText = window.isHost ? guestName : hostName;
+    
+    initGame(Object.keys(cardDB)); 
+
+    // ★ 실시간 스폰 동기화 리스너 등록
+    const spawnRef = window.firebaseRef(window.firebaseDB, `matches/${roomCode}/spawns`);
+    window.firebaseOnChildAdded(spawnRef, (snapshot) => {
+        const data = snapshot.val();
+        let spawnX = data.xRatio * CANVAS_WIDTH;
+        let spawnY = data.yRatio * CANVAS_HEIGHT;
+        let isPlayerUnit = (data.isHost === window.isHost);
+        
+        // 게스트의 경우, 호스트가 보낸 좌표를 상하/좌우 반전하여 적진(위쪽)에서 스폰되게 처리
+        if (!window.isHost) {
+            spawnX = (1 - data.xRatio) * CANVAS_WIDTH;
+            spawnY = (1 - data.yRatio) * CANVAS_HEIGHT;
+        }
+        
+        entities.push(new Unit(spawnX, spawnY, isPlayerUnit, data.cardId));
+    });
+}
+
+
+// --- 덱 해금 (문제 풀이) ---
+let unlockCorrectAnswer = null;
+
+function generateUnlockProblem() {
+    const lockedCards = sortedCardKeys.filter(id => !unlockedCards.includes(id));
+    if (lockedCards.length === 0) {
+        document.getElementById('unlock-question').innerText = "🎉 모든 카드를 해금했습니다! 🎉";
+        document.getElementById('unlock-answers').innerHTML = '';
+        return;
+    }
+    const types = ['rectangle', 'triangle', 'parallelogram'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    let question = ""; let answer = 0; let wrongAnswers = [];
+
+    if (type === 'rectangle') {
+        const w = Math.floor(Math.random() * 5) + 2; const h = Math.floor(Math.random() * 5) + 2;
+        question = `가로 ${w}cm, 세로 ${h}cm인 직사각형 넓이는?`; answer = w * h;
+        wrongAnswers = [answer + w, answer - h + 1, answer + 2];
+    } else if (type === 'triangle') {
+        const b = Math.floor(Math.random() * 4) + 2; let h = Math.floor(Math.random() * 4) + 2;
+        if ((b * h) % 2 !== 0) h++;
+        question = `밑변 ${b}cm, 높이 ${h}cm인 삼각형 넓이는?`; answer = (b * h) / 2;
+        wrongAnswers = [answer + 2, answer + b, answer + 1];
+    } else if (type === 'parallelogram') {
+        const b = Math.floor(Math.random() * 5) + 2; const h = Math.floor(Math.random() * 5) + 2;
+        question = `밑변 ${b}cm, 높이 ${h}cm인 평행사변형 넓이는?`; answer = b * h;
+        wrongAnswers = [answer + 2, (b * h)/2, answer + 1];
+    }
+    wrongAnswers = wrongAnswers.map(ans => Math.max(1, Math.floor(ans)));
+    unlockCorrectAnswer = answer.toString();
+    document.getElementById('unlock-question').innerText = question;
+    
+    let options = [answer.toString(), wrongAnswers[0].toString(), wrongAnswers[1].toString(), wrongAnswers[2].toString()];
+    options = [...new Set(options)];
+    while(options.length < 4) {
+        let dummy = answer + Math.floor(Math.random() * 5) + 1;
+        if(!options.includes(dummy.toString())) options.push(dummy.toString());
+    }
+    options.sort(() => Math.random() - 0.5);
+
+    const btnContainer = document.getElementById('unlock-answers');
+    btnContainer.innerHTML = '';
+    options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = "bg-slate-700 border-4 border-slate-500 text-white font-bold py-6 px-4 rounded-2xl text-3xl hover:bg-slate-600 active:bg-emerald-600 transition-colors shadow-lg";
+        btn.innerText = opt;
+        btn.onclick = () => checkUnlockAnswer(opt, btn);
+        btnContainer.appendChild(btn);
+    });
+}
+
+function checkUnlockAnswer(selected, btn) {
+    if (selected === unlockCorrectAnswer) {
+        btn.classList.replace('bg-slate-700', 'bg-emerald-500');
+        btn.classList.replace('border-slate-500', 'border-emerald-400');
+        const lockedCards = sortedCardKeys.filter(id => !unlockedCards.includes(id));
+        if (lockedCards.length > 0) {
+            const newCardId = lockedCards[Math.floor(Math.random() * lockedCards.length)];
+            unlockedCards.push(newCardId);
+            const modal = document.getElementById('unlock-modal');
+            const display = document.getElementById('unlocked-card-display');
+            display.innerHTML = createCardHTML(cardDB[newCardId], '', false);
+            display.querySelector('.deck-card').onclick = null;
+            display.querySelector('.deck-card').classList.remove('cursor-pointer');
+            setTimeout(() => { modal.classList.remove('hidden'); }, 500);
+        }
+    } else {
+        btn.classList.replace('bg-slate-700', 'bg-red-500');
+        btn.classList.replace('border-slate-500', 'border-red-400');
+        btn.disabled = true;
+    }
+}
+
+function closeUnlockModal() {
+    document.getElementById('unlock-modal').classList.add('hidden');
+    generateUnlockProblem();
+}
+
+
+// --- 전투 렌더링 로직 ---
+let CANVAS_WIDTH, CANVAS_HEIGHT;
+let gameLoopId;
+let lastTime = 0;
+let isGameOver = false;
+
+let elixir = 5.0;
+const MAX_ELIXIR = 10;
+const ELIXIR_GEN_RATE = 0.5;
+
+let entities = [];
+let towers = [];
+let particles = []; 
+let timeRemaining = 120;
+
+let selectedCardIndex = -1;
+let selectedCardCost = 0;
+let windowCurrentSelectedCardId = null;
+let currentEnemyDeck = [];
+
+function resizeCanvas() {
+    CANVAS_WIDTH = battlefield.clientWidth;
+    CANVAS_HEIGHT = battlefield.clientHeight;
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
+}
+window.addEventListener('resize', resizeCanvas);
+
+class Particle {
+    constructor(x, y, color, size, speedX, speedY, life) {
+        this.x = x; this.y = y; this.color = color;
+        this.size = size; this.speedX = speedX; this.speedY = speedY;
+        this.life = life; this.maxLife = life;
+    }
+    update(dt) { this.x += this.speedX * dt; this.y += this.speedY * dt; this.life -= dt; }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+        ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+function spawnParticles(x, y, color, count, speedMod, life) {
+    for(let i=0; i<count; i++) particles.push(new Particle(x, y, color, Math.random()*4+2, (Math.random()-0.5)*speedMod, (Math.random()-0.5)*speedMod, life + Math.random()*0.2));
+}
+
+function generateMathProblem() {
+    const types = ['rectangle', 'triangle', 'parallelogram', 'trapezoid', 'rhombus'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    let question = ""; let answer = 0; let wrongAnswers = [];
+
+    if (type === 'rectangle') {
+        const w = Math.floor(Math.random() * 8) + 3; const h = Math.floor(Math.random() * 8) + 3;
+        question = `가로 ${w}cm, 세로 ${h}cm 직사각형 넓이?`; answer = w * h;
+        wrongAnswers = [answer + w, answer - h + 1, answer + 2];
+    } else if (type === 'triangle') {
+        const b = Math.floor(Math.random() * 8) + 4; let h = Math.floor(Math.random() * 8) + 4;
+        if ((b * h) % 2 !== 0) h++;
+        question = `밑변 ${b}cm, 높이 ${h}cm 삼각형 넓이?`; answer = (b * h) / 2;
+        wrongAnswers = [b * h, answer + b, answer + 1];
+    } else if (type === 'parallelogram') {
+        const b = Math.floor(Math.random() * 8) + 3; const h = Math.floor(Math.random() * 8) + 3;
+        question = `밑변 ${b}cm, 높이 ${h}cm 평행사변형 넓이?`; answer = b * h;
+        wrongAnswers = [answer + b, (b * h) / 2, answer + 2];
+    } else if (type === 'trapezoid') {
+        const top = Math.floor(Math.random() * 6) + 3; const bottom = Math.floor(Math.random() * 6) + top + 2; let h = Math.floor(Math.random() * 6) + 4;
+        if (((top + bottom) * h) % 2 !== 0) h++;
+        question = `윗변 ${top}, 아랫변 ${bottom}, 높이 ${h} 사다리꼴 넓이?`; answer = ((top + bottom) * h) / 2;
+        wrongAnswers = [answer + h, answer * 2, answer - 2];
+    } else if (type === 'rhombus') {
+        const d1 = Math.floor(Math.random() * 8) + 4; let d2 = Math.floor(Math.random() * 8) + 4;
+        if ((d1 * d2) % 2 !== 0) d2++;
+        question = `대각선이 ${d1}cm, ${d2}cm 마름모 넓이?`; answer = (d1 * d2) / 2;
+        wrongAnswers = [d1 * d2, answer + d1, answer + 2];
+    }
+
+    wrongAnswers = wrongAnswers.map(ans => Math.max(1, Math.floor(ans)));
+    currentCorrectAnswer = answer.toString();
+    
+    const questionEl = document.getElementById('question-text');
+    if(question.length > 25) questionEl.classList.replace('text-3xl', 'text-2xl');
+    else questionEl.classList.replace('text-2xl', 'text-3xl');
+    questionEl.innerText = question;
+    
+    let options = [answer.toString(), wrongAnswers[0].toString(), wrongAnswers[1].toString(), wrongAnswers[2].toString()];
+    options = [...new Set(options)];
+    while(options.length < 4) {
+        let dummy = answer + Math.floor(Math.random() * 10) + 1;
+        if(!options.includes(dummy.toString())) options.push(dummy.toString());
+    }
+    options.sort(() => Math.random() - 0.5);
+
+    const btnContainer = document.getElementById('answer-buttons');
+    btnContainer.innerHTML = '';
+    options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = "bg-white border-[3px] border-blue-200 text-blue-800 font-bold py-5 px-4 rounded-xl text-xl hover:bg-blue-50 active:bg-blue-200 transition-colors shadow flex items-center justify-center";
+        btn.innerText = opt;
+        btn.onclick = () => checkAnswer(opt, btn);
+        btnContainer.appendChild(btn);
+    });
+}
+
+function checkAnswer(selected, btn) {
+    if (selected === currentCorrectAnswer) {
+        btn.classList.remove('border-blue-200', 'text-blue-800');
+        btn.classList.add('bg-green-500', 'text-white', 'border-green-600');
+        showFloatingText("정답! 💧+3", "text-green-400", CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
+        addElixir(3);
+        setTimeout(generateMathProblem, 500);
+    } else {
+        btn.classList.remove('border-blue-200', 'text-blue-800');
+        btn.classList.add('bg-red-500', 'text-white', 'border-red-600');
+        btn.disabled = true;
+        showFloatingText("오답! 💧-1", "text-red-500", CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
+        addElixir(-1);
+    }
+}
+
+function addElixir(amount) {
+    elixir += amount;
+    if(elixir > MAX_ELIXIR) elixir = MAX_ELIXIR;
+    if(elixir < 0) elixir = 0;
+    updateElixirUI();
+}
+
+function showFloatingText(text, colorClass, x, y) {
+    const el = document.createElement('div');
+    el.className = `floating-text ${colorClass} font-jua text-3xl z-50`;
+    el.innerText = text;
+    el.style.left = `${x}px`; el.style.top = `${y}px`;
+    el.style.transform = 'translate(-50%, -50%)';
+    battlefield.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+}
+
+class Tower {
+    constructor(x, y, isPlayer, isMain, hpMult = 1) {
+        this.x = x; this.y = y; this.isPlayer = isPlayer; this.isMain = isMain; this.isTower = true;
+        this.maxHp = (isMain ? 3500 : 1500) * hpMult; this.hp = this.maxHp;
+        this.radius = isMain ? 35 : 28;
+        this.range = 150; this.attackDamage = 60; this.attackCooldown = 1.0; this.attackTimer = 0;
+        this.target = null;
+    }
+    update(dt) {
+        if(this.hp <= 0) return;
+        this.attackTimer -= dt;
+        if (this.target && this.target.hp > 0 && Math.hypot(this.target.x - this.x, this.target.y - this.y) <= this.range) { } 
+        else {
+            this.target = null; let minDist = this.range;
+            for(let ent of entities) {
+                if(ent.isPlayer !== this.isPlayer && ent.hp > 0 && !(ent instanceof Bullet) && !(ent instanceof Meteor) && !(ent instanceof BurningGround)) {
+                    let d = Math.hypot(ent.x - this.x, ent.y - this.y);
+                    if(d < minDist) { minDist = d; this.target = ent; }
+                }
+            }
+        }
+        if(this.target && this.attackTimer <= 0) {
+            entities.push(new Bullet(this.x, this.y, this.target, this.attackDamage, this.isPlayer, 'tower'));
+            this.attackTimer = this.attackCooldown;
+        }
+    }
+    draw(ctx) {
+        if(this.hp <= 0) return;
+        const imgKey = this.isMain ? 'mainTower' : 'subTower';
+        const imgMap = this.isPlayer ? loadedImagesPlayer : loadedImagesEnemy;
+        
+        if (imgMap[imgKey] && imgMap[imgKey].complete && imgMap[imgKey].naturalHeight !== 0) {
+            const size = this.radius * 2.5;
+            ctx.drawImage(imgMap[imgKey], this.x - size/2, this.y - size/2, size, size);
+        } else {
+            ctx.fillStyle = this.isPlayer ? '#1d4ed8' : '#b91c1c';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+        }
+
+        const hpPerc = this.hp / this.maxHp;
+        ctx.fillStyle = '#000'; ctx.fillRect(this.x - 25, this.y - this.radius - 12, 50, 8);
+        ctx.fillStyle = this.isPlayer ? '#3b82f6' : '#ef4444'; ctx.fillRect(this.x - 25, this.y - this.radius - 12, 50 * hpPerc, 8);
+    }
+}
+
+class Unit {
+    constructor(x, y, isPlayer, cardId) {
+        this.x = x; this.y = y; this.isPlayer = isPlayer; this.cardId = cardId;
+        const stats = cardDB[cardId];
+        this.type = stats.type; this.radius = stats.radius; this.maxHp = stats.maxHp;
+        this.speed = stats.speed; this.range = stats.range; this.damage = stats.damage; this.cooldown = stats.cooldown;
+        this.isTower = (this.type === 'tower');
+        this.hp = this.maxHp; this.attackTimer = 0; this.target = null; this.jumpCooldown = 0;
+    }
+    update(dt) {
+        if(this.hp <= 0) return;
+        if(this.type === 'tower') { this.hp -= (this.maxHp / 35) * dt; if(this.hp <= 0) return; }
+        this.attackTimer -= dt;
+        if(this.jumpCooldown > 0) this.jumpCooldown -= dt;
+
+        let closest = null; let minDist = Infinity;
+        if (this.type === 'healer') {
+            for (let t of towers) {
+                if (t.isPlayer === this.isPlayer && t.hp > 0 && t.hp < t.maxHp) {
+                    let d = Math.hypot(t.x - this.x, t.y - this.y);
+                    if (d < minDist) { minDist = d; closest = t; }
+                }
+            }
+        } else {
+            let tankClosest = null; let tankMinDist = Infinity;
+            for(let t of towers) {
+                if(t.isPlayer !== this.isPlayer && t.hp > 0) {
+                    let d = Math.hypot(t.x - this.x, t.y - this.y);
+                    if(d < minDist) { minDist = d; closest = t; }
+                }
+            }
+            for(let ent of entities) {
+                if(ent !== this && ent.hp > 0 && ent.isPlayer !== this.isPlayer && !(ent instanceof Bullet) && !(ent instanceof Meteor) && !(ent instanceof BurningGround)) {
+                    let d = Math.hypot(ent.x - this.x, ent.y - this.y);
+                    if (this.type === 'mage' && ent.type === 'tank') {
+                        if (d < tankMinDist) { tankMinDist = d; tankClosest = ent; }
+                    }
+                    if(d < minDist) { minDist = d; closest = ent; }
+                }
+            }
+            if (this.type === 'mage' && tankClosest) { closest = tankClosest; minDist = tankMinDist; }
+        }
+        
+        this.target = closest;
+
+        if(this.target) {
+            if (this.type === 'assassin' && this.jumpCooldown <= 0 && minDist > this.range && minDist <= 180 && (this.target.type === 'mage' || this.target.type === 'archer')) {
+                this.x = this.target.x + (Math.random()*20-10); this.y = this.target.y + (Math.random()*20-10);
+                this.jumpCooldown = 3.0; this.attackTimer = 0.3;
+                minDist = Math.hypot(this.target.x - this.x, this.target.y - this.y);
+            }
+            if(minDist <= this.range) {
+                if(this.attackTimer <= 0) {
+                    if (this.type === 'healer') {
+                        this.target.hp = Math.min(this.target.maxHp, this.target.hp + this.damage);
+                        this.hp -= this.damage * 0.5; spawnParticles(this.target.x, this.target.y, '#34d399', 10, 80, 0.4); 
+                    } else if (this.type === 'archer' || this.type === 'tower') {
+                        entities.push(new Bullet(this.x, this.y, this.target, this.damage, this.isPlayer, this.type));
+                    } else if (this.type === 'mage') {
+                        entities.push(new Meteor(this.target.x, this.target.y, this.damage, this.isPlayer));
+                    } else if (this.type === 'giant_aoe') {
+                        spawnParticles(this.x, this.y, '#9ca3af', 20, 200, 0.4); 
+                        for(let e of entities) { if (e.isPlayer !== this.isPlayer && e.hp > 0 && Math.hypot(e.x-this.x, e.y-this.y) <= 45) e.hp -= this.damage; }
+                        for(let t of towers) { if (t.isPlayer !== this.isPlayer && t.hp > 0 && Math.hypot(t.x-this.x, t.y-this.y) <= 45) t.hp -= this.damage; }
+                    } else {
+                        let actualDamage = this.damage;
+                        if (this.type === 'tank' && this.target.isTower) actualDamage *= 2.0; 
+                        this.target.hp -= actualDamage; spawnParticles(this.target.x, this.target.y, '#fbbf24', 5, 120, 0.2); 
+                    }
+                    this.attackTimer = this.cooldown;
+                }
+            } else if (this.speed > 0) {
+                let dx = this.target.x - this.x; let dy = this.target.y - this.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                this.x += (dx/dist) * this.speed * dt; this.y += (dy/dist) * this.speed * dt;
+            }
+        } else if (this.speed > 0 && this.type !== 'healer') {
+            this.y += this.isPlayer ? -this.speed * dt : this.speed * dt;
+        }
+    }
+    draw(ctx) {
+        if(this.hp <= 0) return;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.ellipse(this.x, this.y + this.radius/2, this.radius*0.8, this.radius*0.4, 0, 0, Math.PI*2); ctx.fill();
+
+        const imgMap = this.isPlayer ? loadedImagesPlayer : loadedImagesEnemy;
+        if (imgMap[this.cardId] && imgMap[this.cardId].complete && imgMap[this.cardId].naturalHeight !== 0) {
+            const size = this.radius * 2.5; ctx.drawImage(imgMap[this.cardId], this.x - size/2, this.y - size/2, size, size);
+        } else {
+            ctx.fillStyle = this.isPlayer ? 'rgba(59, 130, 246, 0.6)' : 'rgba(239, 68, 68, 0.6)';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+        }
+
+        const hpPerc = this.hp / this.maxHp;
+        ctx.fillStyle = '#000'; ctx.fillRect(this.x - 15, this.y - this.radius - 10, 30, 5);
+        ctx.fillStyle = this.isPlayer ? '#60a5fa' : '#f87171'; ctx.fillRect(this.x - 15, this.y - this.radius - 10, 30 * hpPerc, 5);
+    }
+}
+
+class Bullet {
+    constructor(x, y, target, damage, isPlayer, sourceType) {
+        this.x = x; this.y = y; this.target = target;
+        this.damage = damage; this.isPlayer = isPlayer; this.sourceType = sourceType;
+        this.speed = 350; this.hp = 1; this.trail = []; this.color = isPlayer ? '#60a5fa' : '#f87171';
+    }
+    update(dt) {
+        this.trail.push({x: this.x, y: this.y}); if(this.trail.length > 5) this.trail.shift();
+        if(!this.target || this.target.hp <= 0) { this.hp = 0; return; }
+        let dx = this.target.x - this.x; let dy = this.target.y - this.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        
+        if(dist < 15) {
+            let actualDamage = this.damage;
+            if ((this.target.type === 'speed' || this.target.type === 'assassin') && this.sourceType === 'archer') actualDamage *= 0.5;
+            this.target.hp -= actualDamage; this.hp = 0; spawnParticles(this.target.x, this.target.y, this.color, 8, 150, 0.2); 
+        } else {
+            this.x += (dx/dist) * this.speed * dt; this.y += (dy/dist) * this.speed * dt;
+        }
+    }
+    draw(ctx) {
+        if (this.trail.length > 1) {
+            ctx.beginPath(); ctx.moveTo(this.trail[0].x, this.trail[0].y);
+            for(let i=1; i<this.trail.length; i++) ctx.lineTo(this.trail[i].x, this.trail[i].y);
+            ctx.strokeStyle = this.color; ctx.lineWidth = 4; ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1.0;
+        }
+        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(this.x, this.y, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = this.color; ctx.lineWidth = 2; ctx.stroke();
+    }
+}
+
+class Meteor {
+    constructor(x, y, damage, isPlayer) {
+        this.x = x; this.y = y; this.damage = damage; this.isPlayer = isPlayer;
+        this.timer = 0.5; this.hp = 1; this.radius = 45;
+    }
+    update(dt) {
+        this.timer -= dt;
+        if(this.timer <= 0) {
+            for(let e of entities) { if (e.isPlayer !== this.isPlayer && e.hp > 0 && Math.hypot(e.x-this.x, e.y-this.y) <= this.radius) e.hp -= this.damage; }
+            for(let t of towers) { if (t.isPlayer !== this.isPlayer && t.hp > 0 && Math.hypot(t.x-this.x, t.y-this.y) <= this.radius) t.hp -= this.damage; }
+            entities.push(new BurningGround(this.x, this.y, this.isPlayer));
+            spawnParticles(this.x, this.y, '#ef4444', 30, 300, 0.5); this.hp = 0;
+        }
+    }
+    draw(ctx) {
+        let size = 20 + (0.5 - this.timer) * 50;
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+        ctx.beginPath(); ctx.arc(this.x, this.y - (this.timer * 300), size, 0, Math.PI * 2); ctx.fill();
+    }
+}
+
+class BurningGround {
+    constructor(x, y, isPlayer) {
+        this.x = x; this.y = y; this.isPlayer = isPlayer;
+        this.timer = 3.0; this.tick = 0; this.hp = 1; this.radius = 45;
+    }
+    update(dt) {
+        this.timer -= dt; this.tick -= dt;
+        if(this.tick <= 0) {
+            for(let e of entities) { if (e.isPlayer !== this.isPlayer && e.hp > 0 && Math.hypot(e.x-this.x, e.y-this.y) <= this.radius) e.hp -= 20; }
+            this.tick = 0.5; spawnParticles(this.x, this.y, '#f97316', 2, 50, 0.3); 
+        }
+        if(this.timer <= 0) this.hp = 0;
+    }
+    draw(ctx) {
+        ctx.fillStyle = 'rgba(249, 115, 22, 0.3)'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(249, 115, 22, 0.6)'; ctx.stroke();
+    }
+}
+
+function initGame(enemyDeckConfig) {
+    resizeCanvas();
+    entities = []; towers = []; particles = []; 
+    elixir = 5.0; timeRemaining = 120; isGameOver = false;
+    document.getElementById('game-over').style.display = 'none';
+
+    const enemyHpMult = (!window.isMultiplayer && currentMode > 0) ? 1 + (currentMode - 1) * 0.5 : 1;
+    currentEnemyDeck = enemyDeckConfig || Object.keys(cardDB);
+
+    towers.push(new Tower(CANVAS_WIDTH * 0.2, CANVAS_HEIGHT - 120, true, false, 1)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.8, CANVAS_HEIGHT - 120, true, false, 1)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.5, CANVAS_HEIGHT - 40, true, true, 1)); 
+
+    towers.push(new Tower(CANVAS_WIDTH * 0.2, 120, false, false, enemyHpMult)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.8, 120, false, false, enemyHpMult)); 
+    towers.push(new Tower(CANVAS_WIDTH * 0.5, 40, false, true, enemyHpMult)); 
+
+    generateMathProblem();
+    lastTime = performance.now();
+    gameLoopId = requestAnimationFrame(gameLoop);
+    
+    if(window.enemySpawnInterval) clearInterval(window.enemySpawnInterval);
+    
+    // 싱글플레이 전용 (멀티플레이에서는 작동 안 함)
+    if (!window.isMultiplayer) {
+        const spawnRate = 3500 - (currentMode * 400); 
+        window.enemySpawnInterval = setInterval(enemyAI, spawnRate);
+    }
+}
+
+function enemyAI() {
+    if(isGameOver) return;
+    const randomCardId = currentEnemyDeck[Math.floor(Math.random() * currentEnemyDeck.length)];
+    const isLeft = Math.random() > 0.5;
+    const spawnX = isLeft ? CANVAS_WIDTH * 0.2 : CANVAS_WIDTH * 0.8;
+    const spawnY = 180; 
+    
+    if(Math.random() > 0.2) entities.push(new Unit(spawnX + (Math.random()*40-20), spawnY, false, randomCardId));
+}
+
+function selectCard(index, cost, cardId) {
+    if (selectedCardIndex === index) { clearSelection(); return; }
+    selectedCardIndex = index; selectedCardCost = cost; windowCurrentSelectedCardId = cardId;
+    const cards = document.querySelectorAll('#card-deck .card');
+    cards.forEach((c, i) => { if(i === index) c.classList.add('selected'); else c.classList.remove('selected'); });
+}
+
+function clearSelection() {
+    selectedCardIndex = -1; windowCurrentSelectedCardId = null;
+    document.querySelectorAll('#card-deck .card').forEach(c => c.classList.remove('selected'));
+}
+
+battlefield.addEventListener('click', (e) => {
+    if (selectedCardIndex === -1 || isGameOver) return;
+    const rect = canvas.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+
+    let validTower = null;
+    for (let t of towers) {
+        if (t.isPlayer && t.hp > 0 && Math.sqrt(Math.pow(x-t.x, 2) + Math.pow(y-t.y, 2)) <= 90) { validTower = t; break; }
+    }
+    if (!validTower) { showFloatingText("아군 타워 근처에만 소환할 수 있습니다!", "text-red-500", x, y); return; }
+
+    if (elixir >= selectedCardCost) {
+        elixir -= selectedCardCost; updateElixirUI();
+        
+        // ★ PVP 멀티플레이 실시간 스폰
+        if (window.isMultiplayer) {
+            let xRatio = x / CANVAS_WIDTH;
+            let yRatio = y / CANVAS_HEIGHT;
+            
+            // 게스트 기준으로는 좌표를 반전시켜서 DB에 올립니다.
+            if (!window.isHost) {
+                xRatio = 1 - xRatio;
+                yRatio = 1 - yRatio;
+            }
+            
+            window.firebasePush(window.firebaseRef(window.firebaseDB, `matches/${roomCode}/spawns`), {
+                cardId: windowCurrentSelectedCardId,
+                xRatio: xRatio,
+                yRatio: yRatio,
+                isHost: window.isHost,
+                timestamp: Date.now()
+            });
+        } else {
+            // 싱글플레이
+            entities.push(new Unit(x, y, true, windowCurrentSelectedCardId)); 
+        }
+    } else {
+        showFloatingText("엘릭서 부족!", "text-red-500", x, y);
+    }
+});
+
+function updateElixirUI() {
+    document.getElementById('elixir-text').innerText = Math.floor(elixir);
+    document.getElementById('elixir-bar').style.width = `${(elixir / MAX_ELIXIR) * 100}%`;
+    const cards = document.querySelectorAll('#card-deck .card');
+    cards.forEach((c, i) => {
+        if (elixir < cardDB[myDeck[i]].cost) c.classList.add('disabled'); else c.classList.remove('disabled');
+    });
+}
+
+function checkWinCondition() {
+    let playerMainAlive = false; let enemyMainAlive = false;
+    for(let t of towers) {
+        if(t.isMain && t.hp > 0) { if(t.isPlayer) playerMainAlive = true; else enemyMainAlive = true; }
+    }
+
+    if(!playerMainAlive || !enemyMainAlive || timeRemaining <= 0) {
+        isGameOver = true;
+        const overScreen = document.getElementById('game-over');
+        const title = document.getElementById('game-over-title');
+        const desc = document.getElementById('game-over-desc');
+        const btn = document.getElementById('restart-btn');
+        
+        overScreen.style.display = 'flex';
+        if(!playerMainAlive) { 
+            title.innerText = "패배..."; title.className = "text-7xl font-jua mb-6 text-red-500"; 
+            desc.innerText = "수학 공부를 조금 더 해볼까요?"; 
+            btn.innerText = "다시 도전하기";
+        } 
+        else if(!enemyMainAlive) { 
+            title.innerText = "승리!"; title.className = "text-7xl font-jua mb-6 text-yellow-400"; 
+            if (currentMode === 3 && !window.isMultiplayer) {
+                desc.innerText = "최종 보스를 물리쳤습니다! 브레인 로얄 제패!";
+                btn.innerText = "처음으로 돌아가기";
+            } else if (window.isMultiplayer) {
+                desc.innerText = "멀티플레이 대전에서 승리했습니다!";
+                btn.innerText = "로비로 돌아가기";
+            } else {
+                desc.innerText = "훌륭합니다! 다음 스테이지가 열렸습니다.";
+                btn.innerText = "다음 스테이지로";
+                if (maxUnlockedStage === currentMode) maxUnlockedStage++;
+            }
+        } 
+        else { 
+            title.innerText = "무승부"; title.className = "text-7xl font-jua mb-6 text-gray-400"; 
+            desc.innerText = "시간 초과!"; 
+            btn.innerText = "로비로 돌아가기";
+        }
+
+        btn.onclick = () => {
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('battle-screen').style.display = 'none';
+            
+            if (window.isMultiplayer) {
+                cancelMatchmaking();
+            } else {
+                if (currentMode === 3 && !enemyMainAlive) {
+                    currentMode = 1; maxUnlockedStage = 1; 
+                    showScreen('title-screen');
+                } else {
+                    if(!enemyMainAlive && currentMode > 0 && currentMode < 3) currentMode++;
+                    renderDeckScreen(); showScreen('deck-screen'); 
+                }
+            }
+            cancelAnimationFrame(gameLoopId);
+            if(window.enemySpawnInterval) clearInterval(window.enemySpawnInterval);
+        };
+    }
+}
+
+function gameLoop(timestamp) {
+    if(isGameOver) return;
+    const dt = (timestamp - lastTime) / 1000; lastTime = timestamp;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    timeRemaining -= dt;
+    const mins = Math.floor(Math.max(0, timeRemaining) / 60); const secs = Math.floor(Math.max(0, timeRemaining) % 60);
+    document.getElementById('timer').innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    
+    if(timeRemaining <= 0 && !isGameOver) checkWinCondition();
+
+    elixir += ELIXIR_GEN_RATE * dt; if(elixir > MAX_ELIXIR) elixir = MAX_ELIXIR; updateElixirUI();
+
+    for(let t of towers) { t.update(dt); t.draw(ctx); }
+
+    for (let i = entities.length - 1; i >= 0; i--) {
+        let ent = entities[i]; ent.update(dt); ent.draw(ctx);
+        if (ent.hp <= 0) {
+            let color = ent.isPlayer ? '#3b82f6' : '#ef4444';
+            spawnParticles(ent.x, ent.y, color, 15, 200, 0.4);
+            entities.splice(i, 1);
+        }
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update(dt); particles[i].draw(ctx);
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    checkWinCondition();
+
+    if (selectedCardIndex !== -1) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        for (let t of towers) {
+            if (t.isPlayer && t.hp > 0) {
+                ctx.beginPath(); ctx.arc(t.x, t.y, 90, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(74, 222, 128, 0.4)'; ctx.fill();
+                ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(74, 222, 128, 0.9)'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+            }
+        }
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; ctx.font = "24px Jua"; ctx.textAlign = "center";
+        ctx.fillText("빛나는 구역을 연속 터치하여 물량 소환! (취소: 카드 재터치)", CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.75);
+    }
+
+    if(!isGameOver) gameLoopId = requestAnimationFrame(gameLoop);
+}
+
+window.onload = () => { window.multiplayerStarted = false; showScreen('title-screen'); setTimeout(resizeCanvas, 200); };
+</script>
+</body>
+</html>
