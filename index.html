@@ -331,7 +331,7 @@
         <div id="battle-section">
             <div class="bg-gray-900 text-white p-2 text-center shadow-md z-10 flex justify-between items-center px-4 text-sm md:text-base shrink-0">
                 <span id="top-name-display" class="font-bold text-red-400">레드 진영 (상대)</span>
-                <!-- 변경됨: 시작 시간이 05:00으로 표시됩니다 -->
+                <!-- 시작 시간 5분 -->
                 <span id="timer" class="text-yellow-400 font-jua text-xl md:text-2xl tracking-wider">05:00</span>
                 <span id="bottom-name-display" class="font-bold text-blue-400">블루 진영 (나)</span>
             </div>
@@ -995,20 +995,22 @@ function startGameMultiplayer(hostName, guestName) {
 
 // --- Battle Logic & UI ---
 let CANVAS_WIDTH, CANVAS_HEIGHT;
-let gameLoopId;
+window.gameLoopId = null; // 전역 버그 픽스를 위해 window 객체에 할당
 let lastTime = 0;
 let isGameOver = false;
 
 let elixir = 5.0;
 const MAX_ELIXIR = 10;
-const ELIXIR_GEN_RATE = 0.5;
+// ★ 엘릭서 생성 속도를 0.5 -> 0.25로 절반 감소 (너프)
+const ELIXIR_GEN_RATE = 0.25;
 
 let entities = []; let towers = []; let particles = []; 
-let timeRemaining = 180;
+let timeRemaining = 300;
 
 let selectedCardIndex = -1; let selectedCardCost = 0; let windowCurrentSelectedCardId = null;
 let currentEnemyDeck = [];
-window.lastSummonTime = 0; // 연타 방지 쿨타임용 변수
+window.lastSummonTime = 0; 
+let lastElixirIntUI = -1; // UI 성능 최적화용
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -1036,45 +1038,48 @@ function renderBattleDeck() {
             </div>
         `;
     }).join('');
-    updateElixirUI();
+    window.cardDeckEls = document.querySelectorAll('#card-deck .card'); // 캐싱
+    updateElixirUI(true); // 강제 업데이트
 }
 
 window.selectCard = function(index, cost, cardId) {
     if (selectedCardIndex === index) { window.clearSelection(); return; }
     selectedCardIndex = index; selectedCardCost = cost; windowCurrentSelectedCardId = cardId;
-    const cards = document.querySelectorAll('#card-deck .card');
-    cards.forEach((c, i) => { if(i === index) c.classList.add('selected'); else c.classList.remove('selected'); });
+    if (window.cardDeckEls) {
+        window.cardDeckEls.forEach((c, i) => { if(i === index) c.classList.add('selected'); else c.classList.remove('selected'); });
+    }
 };
 
 window.clearSelection = function() {
     selectedCardIndex = -1; windowCurrentSelectedCardId = null;
-    document.querySelectorAll('#card-deck .card').forEach(c => c.classList.remove('selected'));
+    if (window.cardDeckEls) window.cardDeckEls.forEach(c => c.classList.remove('selected'));
 };
 
 battlefield.addEventListener('click', async (e) => {
     if (selectedCardIndex === -1 || isGameOver) return;
     
-    // ★ 연타 방지 쿨타임 (250ms) - 네트워크 유실 및 중복 생성 방지
+    // 연타 방지 쿨타임 (250ms) - 네트워크 유실 및 중복 생성 방지
     const now = Date.now();
-    if (window.lastSummonTime && now - window.lastSummonTime < 250) {
-        return; 
-    }
+    if (window.lastSummonTime && now - window.lastSummonTime < 250) return; 
     
     const rect = canvas.getBoundingClientRect(); 
-    // 터치 및 클릭 정확도 보정
     const x = e.clientX - rect.left; 
     const y = e.clientY - rect.top;
 
-    let validTower = null;
-    for (let t of towers) {
-        // 내 진영(myTeam)의 타워 주변에서만 소환 가능
-        if (t.team === window.myTeam && t.hp > 0 && Math.sqrt(Math.pow(x-t.x, 2) + Math.pow(y-t.y, 2)) <= 90) { validTower = t; break; }
+    // ★ 타워 주변이 아닌 '내 진영(화면의 절반)' 체크로 소환 규칙 변경
+    let validArea = false;
+    if (window.myTeam === 'blue' && y > CANVAS_HEIGHT / 2) validArea = true;
+    if (window.myTeam === 'red' && y < CANVAS_HEIGHT / 2) validArea = true;
+
+    if (!validArea) { 
+        window.showToast("아군 진영(절반)에만 소환할 수 있습니다!"); 
+        return; 
     }
-    if (!validTower) { window.showToast("아군 타워 근처에 소환하세요!"); return; }
 
     if (elixir >= selectedCardCost) {
         window.lastSummonTime = now; // 쿨타임 기록
-        elixir -= selectedCardCost; updateElixirUI();
+        elixir -= selectedCardCost; 
+        updateElixirUI(true);
         
         // 로컬에 즉시 스폰
         entities.push(new Unit(x, y, window.myTeam, windowCurrentSelectedCardId)); 
@@ -1168,7 +1173,7 @@ class Unit {
     constructor(x, y, team, cardId) {
         this.x = x; this.y = y; this.team = team; this.cardId = cardId;
         const stats = cardDB[cardId];
-        this.type = stats.type; this.radius = stats.radius * 0.8; // 모바일 고려 약간 축소
+        this.type = stats.type; this.radius = stats.radius * 0.8; 
         this.maxHp = stats.maxHp;
         this.speed = stats.speed; this.range = stats.range; this.damage = stats.damage; this.cooldown = stats.cooldown;
         this.isTower = (this.type === 'tower');
@@ -1402,7 +1407,7 @@ function addElixir(amount) {
     elixir += amount;
     if(elixir > MAX_ELIXIR) elixir = MAX_ELIXIR;
     if(elixir < 0) elixir = 0;
-    updateElixirUI();
+    updateElixirUI(true);
 }
 
 function showFloatingText(text, colorClass, x, y) {
@@ -1414,13 +1419,25 @@ function showFloatingText(text, colorClass, x, y) {
     setTimeout(() => el.remove(), 1000);
 }
 
-function updateElixirUI() {
-    document.getElementById('elixir-text').innerText = Math.floor(elixir);
+// UI 성능을 위해 엘릭서가 1 이상 바뀔 때만 DOM을 조작하도록 최적화
+function updateElixirUI(force = false) {
+    let currentInt = Math.floor(elixir);
+    if (force || currentInt !== lastElixirIntUI) {
+        document.getElementById('elixir-text').innerText = currentInt;
+        lastElixirIntUI = currentInt;
+    }
+    
     document.getElementById('elixir-bar').style.width = `${(elixir / MAX_ELIXIR) * 100}%`;
-    const cards = document.querySelectorAll('#card-deck .card');
-    cards.forEach((c, i) => {
-        if (elixir < cardDB[myDeck[i]].cost) c.classList.add('disabled'); else c.classList.remove('disabled');
-    });
+    
+    if (window.cardDeckEls) {
+        window.cardDeckEls.forEach((c, i) => {
+            if (elixir < cardDB[myDeck[i]].cost) {
+                if (!c.classList.contains('disabled')) c.classList.add('disabled');
+            } else {
+                if (c.classList.contains('disabled')) c.classList.remove('disabled');
+            }
+        });
+    }
 }
 
 
@@ -1429,22 +1446,22 @@ function initGame(enemyDeckConfig) {
     document.getElementById('battle-screen').style.display = 'flex';
     resizeCanvas();
     entities = []; towers = []; particles = []; 
-    // ★ 타이머를 300초(5분)로 연장
+    // ★ 타이머 300초(5분)
     elixir = 5.0; timeRemaining = 300; isGameOver = false;
+    lastElixirIntUI = -1;
     document.getElementById('game-over').style.display = 'none';
 
     const enemyHpMult = (gameMode === 'stage' && currentStage > 0) ? 1 + (currentStage - 1) * 0.5 : 1;
     currentEnemyDeck = enemyDeckConfig || Object.keys(cardDB);
 
-    // 절대 진영 할당: 방장은 Blue(하단), 도전자는 Red(상단)
     window.myTeam = (window.isMultiplayer && !window.isHost) ? 'red' : 'blue';
 
-    // Blue Towers (Bottom - 하단)
+    // Blue Towers (Bottom)
     towers.push(new Tower(CANVAS_WIDTH * 0.2, CANVAS_HEIGHT - 90, 'blue', false, window.myTeam === 'red' ? enemyHpMult : 1)); 
     towers.push(new Tower(CANVAS_WIDTH * 0.8, CANVAS_HEIGHT - 90, 'blue', false, window.myTeam === 'red' ? enemyHpMult : 1)); 
     towers.push(new Tower(CANVAS_WIDTH * 0.5, CANVAS_HEIGHT - 30, 'blue', true, window.myTeam === 'red' ? enemyHpMult : 1)); 
 
-    // Red Towers (Top - 상단)
+    // Red Towers (Top)
     towers.push(new Tower(CANVAS_WIDTH * 0.2, 90, 'red', false, window.myTeam === 'blue' ? enemyHpMult : 1)); 
     towers.push(new Tower(CANVAS_WIDTH * 0.8, 90, 'red', false, window.myTeam === 'blue' ? enemyHpMult : 1)); 
     towers.push(new Tower(CANVAS_WIDTH * 0.5, 30, 'red', true, window.myTeam === 'blue' ? enemyHpMult : 1)); 
@@ -1454,21 +1471,24 @@ function initGame(enemyDeckConfig) {
     
     if(window.enemySpawnInterval) clearInterval(window.enemySpawnInterval);
     
-    // 싱글플레이 또는 AI 모드일 때 봇 구동
     if (gameMode === 'stage' || window.isVsAI) {
-        const diff = window.isVsAI ? 2 : currentStage; // AI모드는 스테이지 2수준
+        const diff = window.isVsAI ? 2 : currentStage; 
         const spawnRate = 3500 - (diff * 400); 
         window.enemySpawnInterval = setInterval(enemyAI, spawnRate);
     }
     
-    gameLoopId = requestAnimationFrame(gameLoop);
+    // ★ 기존 프레임 중복 실행 버그 완벽 차단
+    if (window.gameLoopId) {
+        cancelAnimationFrame(window.gameLoopId);
+        window.gameLoopId = null;
+    }
+    window.gameLoopId = requestAnimationFrame(gameLoop);
 }
 
 function enemyAI() {
     if(isGameOver) return;
     const randomCardId = currentEnemyDeck[Math.floor(Math.random() * currentEnemyDeck.length)];
     const isLeft = Math.random() > 0.5;
-    // AI(적)는 무조건 Red(위쪽)에서 스폰됩니다.
     const spawnX = isLeft ? CANVAS_WIDTH * 0.2 : CANVAS_WIDTH * 0.8;
     const spawnY = 120; 
     
@@ -1477,7 +1497,7 @@ function enemyAI() {
 
 function checkWinCondition() {
     let myMainAlive = false; let enemyMainAlive = false;
-    let myTowerCount = 0; let enemyTowerCount = 0; // 타워 개수 카운트
+    let myTowerCount = 0; let enemyTowerCount = 0; 
     
     for(let t of towers) {
         if(t.hp > 0) { 
@@ -1500,23 +1520,19 @@ function checkWinCondition() {
         
         overScreen.style.display = 'flex';
         
-        // 결과 판정 로직
         let result = "";
-        
         if (!myMainAlive && enemyMainAlive) {
-            result = "lose"; // 메인 타워 파괴됨
+            result = "lose";
         } else if (myMainAlive && !enemyMainAlive) {
-            result = "win"; // 상대 메인 타워 파괴함
+            result = "win";
         } else if (!myMainAlive && !enemyMainAlive) {
-            result = "draw"; // 동시 파괴
+            result = "draw";
         } else if (timeRemaining <= 0) {
-            // 시간 종료 시 타워 개수로 판정
             if (myTowerCount > enemyTowerCount) result = "win";
             else if (myTowerCount < enemyTowerCount) result = "lose";
-            else result = "draw"; // 타워 개수가 같으면 무승부
+            else result = "draw";
         }
         
-        // 판정에 따른 UI 업데이트
         if(result === "lose") { 
             title.innerText = "패배..."; title.className = "text-5xl md:text-7xl font-jua mb-6 text-red-500"; 
             desc.innerText = (timeRemaining <= 0) ? "타워 개수에서 밀렸습니다!" : "수학 공부를 조금 더 해볼까요?"; 
@@ -1546,11 +1562,14 @@ function checkWinCondition() {
             document.getElementById('game-over').style.display = 'none';
             document.getElementById('battle-screen').style.display = 'none';
             
-            cancelAnimationFrame(gameLoopId);
+            if (window.gameLoopId) {
+                cancelAnimationFrame(window.gameLoopId);
+                window.gameLoopId = null;
+            }
             if(window.enemySpawnInterval) clearInterval(window.enemySpawnInterval);
             
             if (gameMode === 'pvp') {
-                window.cancelMatchmaking(); // PVP 종료 시 방 정리
+                window.cancelMatchmaking(); 
             } else {
                 if (currentStage === 3 && result === "win") {
                     currentStage = 1; maxUnlockedStage = 1; 
@@ -1566,7 +1585,11 @@ function checkWinCondition() {
 
 function gameLoop(timestamp) {
     if(isGameOver) return;
-    const dt = (timestamp - lastTime) / 1000; lastTime = timestamp;
+    
+    // ★ 화면 전환 렉 등으로 인한 과도한 dt 누적 방지 (최대 100ms 제한)
+    let dt = (timestamp - lastTime) / 1000; 
+    lastTime = timestamp;
+    if (dt > 0.1) dt = 0.1; 
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1596,20 +1619,27 @@ function gameLoop(timestamp) {
 
     checkWinCondition();
 
+    // ★ 소환 가능한 진영(자신의 절반 영역) 하이라이트 시각화
     if (selectedCardIndex !== -1) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-        for (let t of towers) {
-            if (t.team === window.myTeam && t.hp > 0) {
-                ctx.beginPath(); ctx.arc(t.x, t.y, 90, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(74, 222, 128, 0.4)'; ctx.fill();
-                ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(74, 222, 128, 0.9)'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
-            }
+        
+        ctx.fillStyle = 'rgba(74, 222, 128, 0.2)';
+        ctx.beginPath();
+        if (window.myTeam === 'blue') {
+            ctx.fillRect(0, CANVAS_HEIGHT / 2, CANVAS_WIDTH, CANVAS_HEIGHT / 2);
+            ctx.moveTo(0, CANVAS_HEIGHT / 2); ctx.lineTo(CANVAS_WIDTH, CANVAS_HEIGHT / 2);
+        } else {
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT / 2);
+            ctx.moveTo(0, CANVAS_HEIGHT / 2); ctx.lineTo(CANVAS_WIDTH, CANVAS_HEIGHT / 2);
         }
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(74, 222, 128, 0.8)'; ctx.setLineDash([10, 10]); ctx.stroke(); ctx.setLineDash([]);
+        
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; ctx.font = "20px Jua"; ctx.textAlign = "center";
-        ctx.fillText("빛나는 구역을 연속 터치하여 소환!", CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.75);
+        const textY = window.myTeam === 'blue' ? CANVAS_HEIGHT * 0.75 : CANVAS_HEIGHT * 0.25;
+        ctx.fillText("빛나는 아군 진영을 터치하여 소환!", CANVAS_WIDTH / 2, textY);
     }
 
-    if(!isGameOver) gameLoopId = requestAnimationFrame(gameLoop);
+    if(!isGameOver) window.gameLoopId = requestAnimationFrame(gameLoop);
 }
 
 // 초기 화면 진입
